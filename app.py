@@ -83,11 +83,8 @@ def update():
         clone_command = "git clone https://github.com/kuangyezhifeng/xos /tmp/xos"
         subprocess.run(clone_command, shell=True)
 
-        # 清空应用目录
-        shutil.rmtree('/usr/local/xos', ignore_errors=True)
-
-        # 复制克隆下来的文件到应用目录
-        shutil.copytree('/tmp/xos', '/usr/local/xos')
+        # 复制克隆下来的文件到应用目录（覆盖目标目录中的文件）
+        shutil.copytree('/tmp/xos', '/usr/local/xos', dirs_exist_ok=True)
 
         # 进入虚拟环境并重装模块
         activate_command = "source /usr/local/flask/bin/activate && pip install -r /usr/local/xos/requirements.txt"
