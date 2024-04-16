@@ -77,14 +77,32 @@ def login():
 @app.route('/update', methods=['GET'])
 @login_required
 def update():
+    # 创建备份目录的路径
+    backup_dir_name = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
+    backup_dir_path = os.path.join('/xos', backup_dir_name)
+
+    try:
+        # 如果备份目录不存在，则创建它
+        if not os.path.exists(backup_dir_path):
+            os.makedirs(backup_dir_path)
+
+        # 使用 rsync 命令备份源目录到备份目录，并替换目标目录中的文件
+        subprocess.run(["rsync", "-av", "--delete", "/usr/local/xos/", backup_dir_path])
+        logging.info(f"xos 备份成功，路径: {backup_dir_path}")
+
+    except FileExistsError:
+        logging.warning(f"备份目录 {backup_dir_path} 已存在，忽略备份操作")
+    except Exception as e:
+        logging.error(f"备份 xos 项目失败：{e}")
+
     try:
         subprocess.run(["rm", "-rf", "/tmp/xos"])
         # 克隆仓库到本地
         clone_command = "git clone https://github.com/kuangyezhifeng/xos /tmp/xos"
         subprocess.run(clone_command, shell=True)
 
-        # 复制克隆下来的文件到应用目录（覆盖目标目录中的文件）
-        shutil.copytree('/tmp/xos', '/usr/local/xos', dirs_exist_ok=True)
+        # 执行系统命令 rsync，将 /tmp/xos 目录同步到 /usr/local/xos 目录，仅替换已存在的文件
+        subprocess.run(["rsync", "-av", "/tmp/xos/", "/usr/local/xos/"])
 
         # 进入虚拟环境并重装模块
         activate_command = "source /usr/local/flask/bin/activate && pip install -r /usr/local/xos/requirements.txt"

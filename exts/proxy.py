@@ -188,7 +188,6 @@ def xray_useradd():
         logging.error(f"添加 iptables 规则时发生错误: {e}")
 
 
-
 # 设置启停标志
 def set_tag(proxies):
     if proxies.flag == 1:

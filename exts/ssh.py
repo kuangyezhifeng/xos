@@ -43,6 +43,9 @@ def modify_ssh_config(ip, port, username, password):
         client.exec_command('sudo systemctl restart sshd')
         logging.info("sshd 配置修改完成,已经重启服务!")
 
+    except Exception as e:
+        logging.error(f"ssh配置修改异常,请检查账号密码和端口: {e}")
+
     finally:
         # 关闭 SSH 连接
         client.close()
