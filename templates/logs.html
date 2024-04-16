@@ -1,0 +1,46 @@
+{% block styles %}
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <script src="/static/js/bootstrap.min.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+
+        .log-container {
+            background-color: #e85629;
+            opacity: 1;
+            padding: 30px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            height: 100vh; /* 调整为占据整个页面高度 */
+            width: 100%; /* 调整为占据整个页面宽度 */
+            overflow-y: auto; /* 添加滚动条 */
+        }
+
+        .log-content {
+            margin-top: 2px;
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 2px;
+            border-radius: 10px;
+            color: white;
+            text-align: left;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+   <div class="log-container">
+        <h2>[{{ log_type | capitalize }} 日志内容]</h2>
+        <div class="log-content" id="logContent">
+            {% for line in log_content.split('\n')[::-1] %}
+                {{ line }}
+            {% endfor %}
+        </div>
+    </div>
+
+{% endblock %}

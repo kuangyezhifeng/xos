@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <form method="post">
+        <table class="table table-hover custom-table" style="word-break: break-all; word-wrap: break-word;">
+            <tr class="bg-dark">
+                <td class="text-white" style="width: 10%;">编号</td>
+                <td class="text-white" style="width: 10%;">协议</td>
+                <td class="text-white" style="width: 10%;">源端口</td>
+                <td class="text-white" style="width: 15%;">目标IP</td>
+                <td class="text-white" style="width: 10%;">目标端口</td>
+                <td class="text-white" style="width: 10%;">路由</td>
+                <td class="text-white" style="width: 20%;">备注</td>
+                <td class="text-white" style="width: 3%;">修改</td>
+                <td class="text-white" style="width: 3%;">启动</td>
+
+                <td style="color: white; width:3%;">
+                    <input type="checkbox" id="select-all"> 全选
+                </td>
+            </tr>
+            <!-- 将传上来的 connections 进行遍历 输出HTML标签 -->
+            {% for relay in connections.items %}
+                <tr>
+                    <td><span class="badge">{{ loop.index }}</span></td>
+                    <td>{{ relay.protocol }}</td>
+                    <td>{{ relay.source_port }}</td>
+                    <td>{{ relay.target_ip }}</td>
+                    <td>{{ relay.target_port }}</td>
+                    <td>{{ relay.tag }}</td>
+                    <td>{{ relay.note }}</td>
+                    <td>
+                        <a class="btn btn-success" href="{{ url_for('relay_update', id=relay.id) }}">修改</a>
+                    </td>
+
+                    <td>
+                        {% if relay.status == '1' %}
+                            <a class="btn btn-success"
+                               href="{{ url_for('relay_on_off', type='off', id=relay.id) }}">启用</a>
+                        {% elif relay.status == '已关闭' %}
+                            <a class="btn btn-danger"
+                               href="{{ url_for('relay_on_off', type='off', id=relay.id) }}">{{ relay.status }}</a>
+                        {% else %}
+                            <a class="btn btn-warning"
+                               href="{{ url_for('relay_on_off', type='on', id=relay.id) }}">禁用</a>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <input type="checkbox" name="selected_items[]" value="{{ relay.id }}">
+                    </td>
+                </tr>
+            {% endfor %}
+
+            <tr class="bg-dark">
+                <!-- 分页导航 -->
+                <td colspan="7">
+                    <span class="badge badge-secondary mr-2">第 {{ connections.page }} 页</span>
+                    {% if connections.has_prev %}
+                        <a class="btn btn-secondary ml-2"
+                           href="{{ url_for('relay_connections', page=connections.prev_num) }}">上一页</a>
+                    {% else %}
+                        <a class="btn btn-secondary ml-2 disabled" href="#">上一页</a>
+                    {% endif %}
+
+                    {% for num in connections.iter_pages() %}
+                        {% if num %}
+                            {% if num != connections.page %}
+                                <a class="btn btn-secondary ml-2"
+                                   href="{{ url_for('relay_connections', page=num) }}">{{ num }}</a>
+                            {% else %}
+                                <span class="btn btn-primary ml-2">{{ num }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="btn btn-secondary ml-2 disabled">...</span>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if connections.has_next %}
+                        <a class="btn btn-secondary ml-2"
+                           href="{{ url_for('relay_connections', page=connections.next_num) }}">下一页</a>
+                    {% else %}
+                        <a class="btn btn-secondary ml-2 disabled" href="#">下一页</a>
+                    {% endif %}
+
+                </td>
+                <!-- 表单按钮 -->
+                <td class="text-right" style="color: white;">
+                    <button type="submit" class="btn btn-success" formaction="{{ url_for('relay_on_off', type='on') }}">
+                        启动
+                    </button>
+                </td>
+                <td class="text-right" style="color: white;">
+                    <button type="submit" class="btn btn-success"
+                            formaction="{{ url_for('relay_on_off', type='off') }}">禁用
+                    </button>
+                </td>
+                <td class="text-right" style="color: white;">
+                    <button type="submit" class="btn btn-success"
+                            formaction="{{ url_for('relay_on_off', type='delete') }}">删除
+                    </button>
+                </td>
+            </tr>
+        </table>
+    </form>
+    <script>
+        // JavaScript代码，用于处理全选/取消全选逻辑
+        document.getElementById('select-all').addEventListener('change', function () {
+            var checkboxes = document.getElementsByName('selected_items[]');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = this.checked;
+            }
+        });
+    </script>
+{% endblock %}

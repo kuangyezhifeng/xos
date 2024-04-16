@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block styles %}
+    {{ super() }}
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <script src="/static/js/bootstrap.min.js"></script>
+    <style>
+        body {
+            background: url("/static/images/wildlee.svg") no-repeat center;
+            background-position: center 0;
+            background-size: cover;
+            margin: 0;
+        }
+
+        .signin-container {
+            background-color: #e85629;
+            opacity: 0.9;
+            width: 480px;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 10px;
+        }
+
+        .form-control, .btn {
+            border-radius: 5px !important;
+        }
+
+        .col-form-label, .form-check-label {
+            text-align: center !important;
+            color: white !important;
+        }
+
+        .radioBox {
+            display: flex;
+            gap: 20px; /* 调整选项之间的间距 */
+        }
+
+        /* 新增样式，设置 radio 字体颜色为白色 */
+        .form-check-input:checked,
+        .form-check-label {
+            color: white !important;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="signin-container">
+        <form class="form-horizontal" method="post" enctype="multipart/form-data"
+              action="{{ url_for('batch_create_proxies') }}">
+            <input type="hidden" name="id" value="{{ id }}">
+            <div class="form-group">
+                <div class="radioBox">
+                    <div style="display: inline-block; margin-left: 20px;">
+                        <input type="radio" class="form-check-input" id="radio_socks" name="optradio" value="socks"
+                               checked>
+                        <label class="form-check-label" for="radio_socks" style="margin-left: 15px;">socks</label>
+                    </div>
+                    <div style="display: inline-block; margin-left: 20px;">
+                        <input type="radio" class="form-check-input" id="radio_vmess_tcp" name="optradio"
+                               value="vmess_tcp">
+                        <label class="form-check-label" for="radio_vmess_tcp"
+                               style="margin-left: 15px;">vmess_tcp</label>
+                    </div>
+                    <div style="display: inline-block; margin-left: 20px;">
+                        <input type="radio" class="form-check-input" id="radio_vmess_kcp" name="optradio"
+                               value="vmess_kcp">
+                        <label class="form-check-label" for="radio_vmess_kcp"
+                               style="margin-left: 15px;">vmess_kcp</label>
+                    </div>
+                    <div style="display: inline-block; margin-left: 20px;">
+                        <input type="radio" class="form-check-input" id="radio_vless_reality" name="optradio"
+                               value="vless_reality">
+                        <label class="form-check-label" for="radio_vless_reality"
+                               style="margin-left: 15px;">vless_reality</label>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="form-group">
+                <div class="col-sm-12">
+                    <input type="text" name="port" class="form-control" id="inputport" value="10808"
+                           placeholder="端口 默认10808">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="col-sm-12">
+                    <input type="text" name="account" class="form-control" id="inputEmail" value=""
+                           placeholder="账号">
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-sm-12">
+                    <input type="text" name="password" class="form-control" id="inputpassword" value=""
+                           placeholder="密码">
+                </div>
+            </div>
+            <div>
+                        <textarea name="mytextarea" class="form-control mx-auto" rows="15"
+                                  placeholder="每个IP地址或网络独立一行，请注意换行！">
+
+                                    {% if proxy_ip %}
+                                        {{ proxy_ip.auxiliary_ip }}
+                                    {% endif %}
+
+                        </textarea>
+            </div>
+
+            <div class="col-form-label">
+                <label>提示:每个IP地址或网络独立一行，请注意换行！</label>
+                <br>
+                <label>示例: 192.168.0.0/24 192.168.1.5</label>
+                <br>
+                <label>socks 不设端口默认10808 账号密码为空随机生成!</label>
+
+            </div>
+
+            <div class="form-group"
+                 style="display: flex; justify-content: center; align-items: center; color: #808080;">
+                <button type="submit" class="btn col-sm-6">开始配置</button>
+
+            </div>
+        </form>
+    </div>
+{% endblock %}

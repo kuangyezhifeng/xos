@@ -1,0 +1,68 @@
+<script type="text/javascript" src="/static/js/jquery.slim.min.js"></script>
+<link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+<script src="/static/js/bootstrap.min.js"></script>
+<body style="background:url(static/images/wildlee.svg) no-repeat center; background-position: center 0; background-size: cover; margin: 0px;">
+<style>
+    .signin-container {
+        background: rgba(255, 255, 255, 0.2);
+        width: 480px;
+        margin: 0 auto;
+        margin-top: 15%;
+        padding: 42px 42px 39px;
+        display: flex; /* 添加这一行，将容器设置为弹性盒子 */
+        flex-direction: column; /* 设置主轴方向为垂直，让子元素垂直居中 */
+        align-items: center; /* 在主轴上居中子元素 */
+    }
+
+    .button-container {
+        display: flex;
+        justify-content: space-between;
+    }
+</style>
+{% block content %}
+    <div class="signin-container" style="background-color: #e85629; opacity: 0.9; padding: 30px; border-radius: 10px">
+        <div id="signin-container">
+
+            <form class="form-horizontal" method="post" action="{{ url_for('login') }}" style="color: white; font-family: 'FZLanTingHei', sans-serif;">
+                <input type="hidden" name="next" value="{{ next_page }}">
+
+                <div class="form-group row">
+                    <label for="inputUsername" class="col-sm-4 control-label">用户</label>
+                    <div class="col-sm-12">
+                        <input type="text" class="form-control" id="inputUsername" placeholder="username"
+                               name="username">
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="inputPassword" class="col-sm-4 control-label">密码</label>
+                    <div class="col-sm-12">
+                        <input type="password" class="form-control" id="inputPassword" placeholder="password"
+                               name="password">
+                    </div>
+                </div>
+
+                <div class="form-row mt-4">
+                    <div class="col-sm-6">
+                        <button type="submit" class="btn btn-block">登录</button>
+                    </div>
+                    <!-- 注册按钮 -->
+                    <div class="col-sm-6">
+                        <button type="button" onclick="window.location='{{ url_for('register') }}'"
+                                class="btn btn-block">注册
+                        </button>
+                    </div>
+                </div>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="alert alert-{{ messages[0].lower() }}">
+                        {{ messages[1] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            </form>
+
+        </div>
+    </div>
+
+{% endblock %}

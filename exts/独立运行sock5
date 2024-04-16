@@ -1,0 +1,65 @@
+# 2024年3月27日，如果要启用SOCKS独立的运行模式,请改动以下三个函数代码
+
+
+def xray_node_delete_handler(proxy_device):
+    if proxy_device:
+        proxy_url = proxy_device.proxy_url
+        tag = proxy_device.tag
+        access_ip = proxy_device.access_ip
+        protocol = proxy_device.protocol
+        device_ip = proxy_device.device_ip
+
+        # 独立模式运行的SOCKS
+        # if protocol == 'socks':
+        #     uninstall_socks_service(tag, device_ip)
+
+
+
+
+def set_config(proxies):
+    # 拦截socks协议,使用特殊独立运行进程处理
+    # if proxies.protocol == 'socks':
+    #     if proxies.device_ip:
+    #         if proxies.flag == 1:
+    #             uninstall_socks_service(proxies.tag, proxies.device_ip)
+    #         else:
+    #             socks_service_config(proxies.tag, proxies.proxy_url, proxies.device_ip)
+    #         set_tag(proxies)
+    #     else:
+    #         logging.info("socks独立运行,必须绑定设备ip地址!")
+
+
+
+
+def xray_device_route_handler(proxys, raw_text):
+    ip_addresses = get_device_addresses(raw_text)
+
+    # 查询数据库中所有的记录,下面的功能主要解决添加IP被其它的代理绑定，这样可以清理掉数据库中已经存在于别的代理的设备IP
+    all_proxy_records = ProxyDevice.query.all()
+
+    # 遍历所有记录
+    for proxy in all_proxy_records:
+        # 如果记录的device_ip字段不为空，则进行处理
+        if proxy.device_ip:
+            # 将记录的device_ip字段中的值按逗号分隔为列表
+            device_ips = proxy.device_ip.split(',')
+            # 移除匹配到的IP地址
+            updated_ips = [ip for ip in device_ips if ip not in ip_addresses]
+            # 更新device_ip字段为移除匹配到的IP地址后的值
+            proxy.device_ip = ','.join(updated_ips) if updated_ips else None
+
+    # 提交更改到数据库
+    db.session.commit()
+
+    # 更新数据库
+    proxys.device_ip = ','.join(ip_addresses) or None
+    db.session.commit()
+
+    # 重新获取数据库中最新的 device_ip 和 tag 值
+    device_ip = proxys.device_ip
+    tag = proxys.tag
+    protocol = proxys.protocol
+
+    # # 生成和更新路由配置,socks在独立运行模式下使用
+    # if protocol == 'socks':
+    #     logging.info("socks代理无需在主配置中生成设备路由条目")

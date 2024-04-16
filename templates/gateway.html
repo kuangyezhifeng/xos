@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block styles %}
+    {{ super() }}
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <script src="/static/js/bootstrap.min.js"></script>
+    <style>
+        body {
+            background: url(static/images/wildlee.svg) no-repeat center;
+            background-position: center 0;
+            background-size: cover;
+            margin: 0px;
+        }
+
+        .signin-container {
+            background-color: #e85629;
+            opacity: 0.9;
+            width: 1080px;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 10px;
+        }
+
+        .form-control {
+            border-radius: 5px;
+        }
+
+        .btn {
+            border-radius: 5px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px; /* Increase top margin for spacing */
+        }
+
+        /* Increase spacing between checkboxes and labels */
+        .form-check-label {
+            margin-left: 20px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="signin-container" style="background-color: #e85629; opacity: 1; padding: 30px; margin: 10% auto;color: white;">
+        <form class="form-horizontal" method="post" action="{{ url_for('gateway_select') }}">
+            <div class="row">
+                {% for item in target_ips %}
+                    <div class="col-sm-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="selected_target_ip" value="{{ item['ip'] }}-{{ item['tag'] }}" id="{{ item['ip'] }}"
+                                {% if item['selected'] %}checked{% endif %}>
+                            <label class="form-check-label" for="{{ item['ip'] }}">
+                                {{ item['ip'] }} - {{ item['tag'] }}
+                            </label>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="mt-6"></div>
+
+            <div class="button-container mt-4" style="display: flex; color: #808080;">
+                <button type="submit" class="btn col-sm-4">设置网关</button>
+                <button type="button" onclick="window.location='{{ url_for('dashboard') }}'"
+                        class="btn col-sm-4">返回
+                </button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+

@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+
+{% block styles %}
+    {{ super() }}
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <script src="/static/js/bootstrap.min.js"></script>
+    <body style="background:url(static/images/wildlee.svg) no-repeat center; background-position: center 0; background-size: cover; margin: 0px;">
+    <style>
+        .signin-container {
+            background-color: #e85629;
+            opacity: 0.9;
+            width: 480px;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 10px;
+        }
+
+        .form-control {
+            border-radius: 5px;
+            color: black; /* 将文本颜色更改为可见的颜色 */
+            background-color: white; /* 将背景颜色更改为可见的颜色 */
+        }
+
+        .btn {
+            border-radius: 5px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* 使用 col-form-label 类替代 control-label，设置左对齐 */
+        .col-form-label {
+            text-align: left !important;
+            color: white; /* 设置标签字体颜色为白色 */
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="signin-container">
+        <form class="form-horizontal" method="post" action="{{ url_for('host_create') }}">
+
+            <div class="form-group row">
+                <label for="inputuser" class="col-sm-4 col-form-label">用户</label>
+                <div class="col-sm-12">
+                    <input type="text" name="user" class="form-control" id="inputuser" value=""
+                           placeholder="输入用户">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="inputcountry" class="col-sm-4 col-form-label">国家</label>
+                <div class="col-sm-12">
+                    <input type="text" name="country" class="form-control" id="inputcountry" value=""
+                           placeholder="输入国家">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="inputday" class="col-sm-4 col-form-label">日期</label>
+                <div class="col-sm-12">
+                    <input type="date" name="day" class="form-control" id="inputday" value=""
+                           placeholder="输入日期">
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <label for="inputip" class="col-sm-4 col-form-label">IP</label>
+                <div class="col-sm-12">
+                    <input type="text" name="ip" class="form-control" id="inputip" value=""
+                           placeholder="输入IP">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="inputEmail" class="col-sm-4 col-form-label">账号</label>
+                <div class="col-sm-12">
+                    <input type="text" name="account" class="form-control" id="inputEmail" value=""
+                           placeholder="输入账号">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="inputpassword" class="col-sm-4 col-form-label">密码</label>
+                <div class="col-sm-12">
+                    <input type="text" name="password" class="form-control" id="inputpassword" value=""
+                           placeholder="输入密码">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="inputport" class="col-sm-4 col-form-label">端口</label>
+                <div class="col-sm-12">
+                    <input type="text" name="port" class="form-control" id="inputport" value=""
+                           placeholder="输入端口">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="inputwebsite" class="col-sm-4 col-form-label">网站</label>
+                <div class="col-sm-12">
+                    <input type="text" name="website" class="form-control" id="inputwebsite" value=""
+                           placeholder="输入网站">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="inputremark" class="col-sm-4 col-form-label">备注</label>
+                <div class="col-sm-12">
+                    <input type="text" name="remark" class="form-control" id="inputremark" value=""
+                           placeholder="输入备注">
+                </div>
+            </div>
+            <div class="button-container mt-12" style="display: flex; color: #808080;">
+                <button type="submit" class="btn col-sm-4">创建</button>
+                <button type="button" onclick="window.location='{{ url_for('host') }}'" class="btn col-sm-4">返回
+                </button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

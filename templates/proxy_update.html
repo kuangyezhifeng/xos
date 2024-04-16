@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block styles %}
+    {{ super() }}
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <script src="/static/js/bootstrap.min.js"></script>
+    <body style="background:url(static/images/wildlee.svg) no-repeat center; background-position: center 0; background-size: cover; margin: 0px;">
+    <style>
+        .signin-container {
+            background-color: #e85629;
+            opacity: 0.9;
+            width: 480px;
+            margin: 4% auto;
+            padding: 30px;
+            border-radius: 10px;
+                    }
+
+        .form-control {
+            border-radius: 5px;
+            color: black; /* 将文本颜色更改为可见的颜色 */
+            background-color: white; /* 将背景颜色更改为可见的颜色 */
+                    }
+
+        .btn {
+            border-radius: 5px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* 使用 col-form-label 类替代 col-form-label，设置左对齐 */
+        .col-form-label {
+            text-align: left !important;
+            color: white; /* 设置标签字体颜色为白色 */
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="signin-container" style="background-color: #e85629; opacity: 1; padding: 30px; margin: 10% auto;color: white;">
+    {% for info in proxy_device %}
+        <form class="form-horizontal" method="post" enctype="multipart/form-data" action="{{ url_for('node_update') }}">
+            <p><input type="hidden" name="id" value="{{ info.id }}"></p>
+
+            <div class="form-group row">
+                <label for="inputUsername" class="col-sm-4 col-form-label">IP</label>
+                <div class="col-sm-12">
+                    <input type="text" name="proxy_ip" class="form-control" id="inputproxyip" value="{{ info.node_ip }}"
+                        placeholder="代理IP">
+                </div>
+            </div>
+                        <div class="form-group row">
+                <label for="inputUsername" class="col-sm-4 col-form-label">连接</label>
+                <div class="col-sm-12">
+                    <input type="text" name="proxy_url" class="form-control" id="inputprotocol" value="{{ info.proxy_url }}"
+                        placeholder="代理连接" readonly>
+                </div>
+            </div>
+
+
+            <div class="form-group row">
+                <label for="inputUsername" class="col-sm-4 col-form-label">国家</label>
+                <div class="col-sm-12">
+                    <input type="text" name="country" class="form-control" id="inputprotocol" value="{{ info.country }}"
+                        placeholder="国家">
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="inputUsername" class="col-sm-4 col-form-label">协议类型</label>
+                <div class="col-sm-12">
+                    <input type="text" name="protocol" class="form-control" id="inputproxyip" value="{{ info.protocol }}"
+                        placeholder="协议">
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <label for="inputUsername" class="col-sm-4 col-form-label">备注</label>
+                <div class="col-sm-12">
+                    <input type="text" name="note" class="form-control" id="inputproxyurl" value="{{ info.note }}"
+                        placeholder="备注">
+                </div>
+            </div>
+
+                <div class="button-container mt-4" style="color:#808080;">
+                    <button type="submit" class="btn col-sm-4">更新信息</button>
+                    <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn col-sm-4">返回</button>
+                </div>
+
+        </form>
+    {% endfor %}
+</div>
+{% endblock %}

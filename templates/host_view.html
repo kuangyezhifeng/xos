@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+<style>
+    .shorten-text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100px;
+        position: relative;
+    }
+
+    .shorten-text::after {
+        content: attr(data-full-text);
+        position: absolute;
+        top: 0;
+        left: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: clip;
+    }
+</style>
+{% block content %}
+    <form method="post">
+        <table class="table table-hover" style="word-break: break-all; word-wrap: break-word;">
+            <tr class="bg-dark">
+                <td class="text-white">编号</td>
+                <td class="text-white">用户</td>
+                <td class="text-white">IP</td>
+                <td class="text-white">协议</td>
+                <td class="text-white">限速</td>
+                <td class="text-white" style="width: 15%">代理</td>
+                <td class="text-white">创建日期</td>
+                <td class="text-white">到期日期</td>
+                <td class="text-white">备注</td>
+
+                <td class="text-white" width="3%">检测</td>
+                <td class="text-white" width="3%">配置</td>
+                <td class="text-white" width="3%">修改</td>
+                <td class="text-white" width="3%">克隆</td>
+                <td style="color: white; width:3%;">
+                    <input type="checkbox" id="select-all"> 全选
+                </td>
+            </tr>
+            <!-- 将传上来的proxies_data进行遍历 输出HTML标签 -->
+            {% for proxy in proxies.items %}
+                <tr>
+                    <td><span class="badge">{{ loop.index }}</span></td>
+
+                    <td>{{ proxy.user }}</td>
+                    <td>{{ proxy.auxiliary_ip }}</td>
+                    <td>{{ proxy.protocol }}</td>
+                    <td>{{ proxy.speed_limit }}</td>
+                    <td class="shorten-text" data-full-text="{{ proxy.proxy_url }}"
+                        onclick="copyText(this)">{{ proxy.proxy_url }}</td>
+                    <td>{{ proxy.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>
+                        {% if proxy.expiration_date %}
+                            {{ proxy.expiration_date.strftime('%Y-%m-%d %H:%M:%S') }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td>
+
+                        {{ proxy.remark }}
+
+
+                    </td>
+                    <td>
+                        {% if proxy.status %}
+                            {% if proxy.status == 'Fail' %}
+                                <a type="button" class="btn btn-danger"
+                                   href="{{ url_for('host_proxies_test', id=proxy.id) }}">{{ proxy.status }}</a>
+                            {% else %}
+                                <a type="button" class="btn btn-success"
+                                   href="{{ url_for('host_proxies_test', id=proxy.id) }}">{{ proxy.status }}</a>
+                            {% endif %}
+                        {% else %}
+                            <a type="button" class="btn btn-success"
+                               href="{{ url_for('host_proxies_test', id=proxy.id) }}">检测</a>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a type="button" class="btn btn-success"
+                           href="{{ url_for('single_create_proxies', id=proxy.id) }}">配置</a>
+                    </td>
+                    <td>
+                        <a type="button" class="btn btn-success"
+                           href="{{ url_for('proxies_update', id=proxy.id) }}">更新</a>
+                    </td>
+                    <td>
+                        <a type="button" class="btn btn-success"
+                           href="{{ url_for('copy_record', id=proxy.id) }}">克隆</a>
+                    </td>
+                    <td>
+                        <input type="checkbox" name="selected_items[]" value="{{ proxy.id }}">
+                    </td>
+                </tr>
+            {% endfor %}
+
+            <tr class="bg-dark">
+                <!-- 分页导航 -->
+                <td colspan="13">
+                    <span class="badge badge-secondary mr-2">第 {{ proxies.page }} 页</span>
+                    {% if proxies.has_prev %}
+                        <a class="btn btn-secondary ml-2"
+                           href="{{ url_for('host_view', page=proxies.prev_num, id=host_record.id) }}">上一页</a>
+                    {% else %}
+                        <a class="btn btn-secondary ml-2 disabled" href="#">上一页</a>
+                    {% endif %}
+
+                    {% for num in proxies.iter_pages() %}
+                        {% if num %}
+                            {% if num != proxies.page %}
+                                <a class="btn btn-secondary ml-2"
+                                   href="{{ url_for('host_view', page=num, id=host_record.id) }}">{{ num }}</a>
+                            {% else %}
+                                <span class="btn btn-primary ml-2">{{ num }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="btn btn-secondary ml-2 disabled">...</span>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if proxies.has_next %}
+                        <a class="btn btn-secondary ml-2"
+                           href="{{ url_for('host_view', page=proxies.next_num, id=host_record.id) }}">下一页</a>
+                    {% else %}
+                        <a class="btn btn-secondary ml-2 disabled" href="#">下一页</a>
+                    {% endif %}
+                </td>
+                <!-- 表单按钮 -->
+                <td class="text-right" style="color: white;">
+                    <button type="submit" class="btn btn-success" formaction="{{ url_for('proxies_delete') }}">
+                        删除
+                    </button>
+                </td>
+            </tr>
+        </table>
+    </form>
+    <script>
+
+        function copyText(element) {
+            // 创建临时的文本输入框
+            var tempInput = document.createElement("input");
+            tempInput.value = element.getAttribute("data-full-text");
+            document.body.appendChild(tempInput);
+
+            // 选择并复制文本
+            tempInput.select();
+            document.execCommand("copy");
+
+            // 移除临时输入框
+            document.body.removeChild(tempInput);
+
+            // 可以添加一些用户反馈，例如提示复制成功
+            alert("已复制到剪贴板：" + tempInput.value);
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            var tdElements = document.querySelectorAll(".shorten-text");
+
+            tdElements.forEach(function (tdElement) {
+                var originalText = tdElement.textContent;
+                var truncatedText = originalText.substring(0, 50); // 调整字符范围
+                tdElement.textContent = truncatedText;
+                tdElement.title = originalText; // 将原始文本设置为标题
+            });
+        });
+        // JavaScript代码，用于处理全选/取消全选逻辑
+        document.getElementById('select-all').addEventListener('change', function () {
+            var checkboxes = document.getElementsByName('selected_items[]');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = this.checked;
+            }
+        });
+    </script>
+{% endblock %}

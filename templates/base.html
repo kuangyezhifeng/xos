@@ -1,0 +1,271 @@
+{% extends 'bootstrap/base.html' %}
+
+{% block styles %}
+    {{ super() }}
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <link rel="icon" href="/static/images/favicon-16x16.png" sizes="16x16" type="image/png">
+    <link rel="icon" href="/static/images/favicon-32x32.png" sizes="32x32" type="image/png">
+{% endblock %}
+
+{% block navbar %}
+    <nav class="navbar navbar-icon-top navbar-expand-lg navbar-dark bg-dark">
+        <a class="navbar-brand" href="#">
+            <span class="glyphicon glyphicon-cloud" aria-hidden="true"></span>
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item active">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fa fa-home"></i>
+                        <strong>XOS</strong>
+                        <span class="sr-only">(current)</span>
+                    </a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown1" role="button"
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa fa-envelope-o">
+                            <span class="badge badge-success" role="button">SYSTEM</span>
+                        </i>
+                        系统功能
+                    </a>
+                    <div class="dropdown-menu" aria-labelledby="navbarDropdown1">
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('system',exec_type='restart') }}">重启服务</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('gateway_select') }}">设置网关</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('system',exec_type='tproxy') }}">重置代理</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('system',exec_type='xray') }}">重置配置</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('system',exec_type='database') }}">重置数据</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('proxy_share') }}">分享代理</a>
+                        <div class="dropdown-divider"></div>
+                    </div>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa fa-envelope-o">
+                            <span class="badge badge-success" role="button">PROXIES</span>
+                        </i>
+                        创建节点
+                    </a>
+                    <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('dashboard') }}">代理清单</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('get_ip_info') }}">解析代理</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='vmess') }}">VMESS</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='vless') }}">VLESS</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='socks') }}">SOCKS</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='trojan') }}">TROJAN</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='hysteria2') }}">HYSTERIA2</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='shadowsocks') }}">SHADOWSOCKS</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='subscribe') }}">订阅添加</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('database',type='proxy') }}">清空代理</a>
+                        <div class="dropdown-divider"></div>
+                    </div>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa fa-envelope-o">
+                            <span class="badge badge-success" role="button">FORWARD</span>
+                        </i>
+                        中转连接
+                    </a>
+                    <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('relay_connections',type='look') }}">中转清单</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('relay_connections',type= 'add') }}">添加中转</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('relay_on_off',type= 'on') }}">启动中转</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('test_all_ports') }}">测试中转</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('relay_on_off',type= 'off') }}">禁用中转</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('database',type='forward') }}">清空中转</a>
+                        <div class="dropdown-divider"></div>
+
+                    </div>
+                </li>
+
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa fa-envelope-o">
+                            <span class="badge badge-success" role="button">CONVERSION</span>
+                        </i>
+                        协议转换
+                    </a>
+                    <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('conversion')}}">转换清单</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('conversion_create',type='crate') }}">添加转换</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('conversion_select') }}">提取代理</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('conversion_enable') }}">启动转换</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('conversion_disable') }}">禁用转换</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('database',type='conversion') }}">清空转换</a>
+                        <div class="dropdown-divider"></div>
+                    </div>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
+
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa fa-envelope-o">
+                            <span class="badge badge-success" role="button">SERVER</span>
+                        </i>
+                        主机列表&nbsp;&nbsp;
+                    </a>
+                    <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('host') }}">主机清单</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('host_create') }}">主机创建</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('batch_create_proxies') }}">主机搭建</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('batch_get_proxies') }}">代理提取</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('database',type='host') }}">清空主机</a>
+                        <div class="dropdown-divider"></div>
+                    </div>
+
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
+
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa fa-envelope-o">
+                            <span class="badge badge-success" role="button">LOG</span>
+                        </i>
+                        日志信息&nbsp;&nbsp;
+                    </a>
+                    <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('logs', log_type='xos_log') }}"
+                           target="_blank">Xos操作日志</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('logs', log_type='xray_log') }}" target="_blank">Xray信息日志</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('logs', log_type='xray_error_log') }}"
+                           target="_blank">Xray报错日志</a>
+                        <div class="dropdown-divider"></div>
+
+                    </div>
+
+                </li>
+            </ul>
+            <ul class="navbar-nav ml-auto">
+                <li style="color: white; list-style-type: none; display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end;">
+                    <div class="badge badge-success" role="button" style="margin-right: 10px; margin-bottom: 5px;">
+                        <span>CPU:</span><span id="cpuPercentage">0%</span><br>
+
+                        <span>MEM:</span> <span id="memoryPercentage">0%</span>
+                    </div>
+                </li>
+                <li style="color: white; list-style-type: none; display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end;">
+                    <div class="badge badge-success" role="button" style="margin-right: 10px; margin-bottom: 5px;">
+            <span>
+                上传:</span> <span id="uploadSpeed">0 Mbps</span>
+                        <br>
+                        <span>
+                下载:</span> <span id="downloadSpeed">0 Mbps</span>
+                    </div>
+                </li>
+            </ul>
+
+
+            <ul class="navbar-nav">
+                {% if user %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">
+                            <i class="fa fa-user">
+                                <span class="badge badge-info">在线用户</span>
+                            </i>
+                            {{ user.username }}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('change_password') }}">
+                            <i class="fa fa-cogs">
+                                <span class="badge badge-info">修改密码</span>
+                                Password
+                            </i>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}">
+                            <i class="fa fa-sign-out">
+                                <span class="badge badge-danger">退出登录</span>
+                            </i>
+                            Logout
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('login') }}">
+                            <i class="fa fa-bell">
+                                <span class="badge badge-primary">登录</span>
+                            </i>
+                            Login
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('register') }}">
+                            <i class="fa fa-globe">
+                                <span class="badge badge-primary">注册</span>
+                            </i>
+                            Register
+                        </a>
+                    </li>
+                {% endif %}
+
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 在页面底部添加 SocketIO 代码 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        socket.on('update_realtime_data', function (data) {
+            // 转换上传和下载速度为 Mbps
+            var uploadSpeedMbps = data.upload > 0 ? (data.upload * 8 / 1024 / 1024).toFixed(2) : 0;
+            var downloadSpeedMbps = data.download > 0 ? (data.download * 8 / 1024 / 1024).toFixed(2) : 0;
+
+            // 更新页面上的实时数据
+            document.getElementById('cpuPercentage').innerText = data.cpu.toFixed(1) + '%';
+            document.getElementById('memoryPercentage').innerText = data.memory.toFixed(1) + '%';
+            document.getElementById('uploadSpeed').innerText = uploadSpeedMbps + ' Mbps';
+            document.getElementById('downloadSpeed').innerText = downloadSpeedMbps + ' Mbps';
+        });
+    </script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/jquery.min.js"></script>
+{% endblock %}

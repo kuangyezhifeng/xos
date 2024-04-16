@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <form method="post">
+        <table class="table table-hover " style="width: 100%;">
+            <tr class="text-white bg-dark">
+                <td>编号</td>
+                <td>用户</td>
+                <td>国家</td>
+                <td>日期</td>
+                <td>地址</td>
+                <td>账号</td>
+                <td>密码</td>
+                <td>端口</td>
+                <td>SSH</td>
+                <td style="width: 3%;">网站</td>
+                <td style="width: 3%;">备注</td>
+                <td style="width: 2%;">查看</td>
+                <td style="width: 2%;">更新</td>
+                <td style="width: 2%;">限速</td>
+                <td style="color: white; width:2%;">
+                    <input type="checkbox" id="select-all"> 全选
+                </td>
+            </tr>
+
+            {% for host in hosts.items %}
+                <tr>
+                    <td><span class="badge">{{ loop.index }}</span></td>
+                    <td>{{ host.user }}</td>
+                    <td>{{ host.country }}</td>
+                    <td>{{ host.day }}</td>
+                    <td class="shorten-text" data-full-text="{{ host.ip }}" onclick="copyText(this)">{{ host.ip }}</td>
+                    <td>{{ host.account }}</td>
+                    <td class="shorten-text" data-full-text="{{ host.password }}" onclick="copyText(this)">{{ host.password }}</td>
+                    <td>{{ host.port }}</td>
+                    <td>{{ host.active }}</td>
+                    <td>{{ host.website }}</td>
+                    <td class="shorten-text" data-full-text="{{ host.remark }}" onclick="copyText(this)">{{ host.remark }}</td>
+
+                    <td>
+                        <a class="btn btn-success" href="{{ url_for('host_view', id=host.id) }}">查看</a>
+                    </td>
+                    <td>
+                        <a class="btn btn-success" href="{{ url_for('host_update', id=host.id) }}">更新</a>
+                    </td>
+                    <td>
+                        <a class="btn btn-success" href="{{ url_for('batch_speed_limit', id=host.id) }}">限速</a>
+                    </td>
+
+                    <td>
+                        <input type="checkbox" name="selected_items[]" value="{{ host.id }}">
+                    </td>
+                </tr>
+            {% endfor %}
+            <tr class="bg-dark">
+                <td colspan="10">
+                    <span class="badge badge-secondary mr-2">第 {{ hosts.page }} 页</span>
+                    {% if hosts.has_prev %}
+                        <a class="btn btn-secondary ml-2" href="{{ url_for('host', page=hosts.prev_num) }}">上一页</a>
+                    {% else %}
+                        <a class="btn btn-secondary ml-2 disabled" href="#">上一页</a>
+                    {% endif %}
+
+                    {% for num in hosts.iter_pages() %}
+                        {% if num %}
+                            {% if num != hosts.page %}
+                                <a class="btn btn-secondary ml-2" href="{{ url_for('host', page=num) }}">{{ num }}</a>
+                            {% else %}
+                                <span class="btn btn-primary ml-2">{{ num }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="btn btn-secondary ml-2 disabled">...</span>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if hosts.has_next %}
+                        <a class="btn btn-secondary ml-2" href="{{ url_for('host', page=hosts.next_num) }}">下一页</a>
+                    {% else %}
+                        <a class="btn btn-secondary ml-2 disabled" href="#">下一页</a>
+                    {% endif %}
+                </td>
+                <!-- 表单按钮 -->
+
+                <td class="text-right" >
+                    <button type="submit" class="btn btn-success" formaction="{{ url_for('host_status') }}">免密</button>
+                </td>
+                <td class="text-right"  >
+                    <button type="submit" class="btn btn-success" formaction="{{ url_for('host_ips') }}">地址</button>
+                </td>
+
+                <td class="text-right" >
+                    <button type="submit" class="btn btn-success" formaction="{{ url_for('xray_install') }}">服务</button>
+                </td>
+                <td class="text-right" >
+                    <button type="submit" class="btn btn-success" formaction="{{ url_for('host_proxies_test') }}">验证</button>
+                </td>
+                <td class="text-right" >
+                    <button type="submit" class="btn btn-success" formaction="{{ url_for('host_delete') }}">删除</button>
+                </td>
+
+            </tr>
+        </table>
+    </form>
+        <script>
+                function copyText(element) {
+            // 创建临时的文本输入框
+            var tempInput = document.createElement("input");
+            tempInput.value = element.getAttribute("data-full-text");
+            document.body.appendChild(tempInput);
+
+            // 选择并复制文本
+            tempInput.select();
+            document.execCommand("copy");
+
+            // 移除临时输入框
+            document.body.removeChild(tempInput);
+
+            // 可以添加一些用户反馈，例如提示复制成功
+            alert("已复制到剪贴板：" + tempInput.value);
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            var tdElements = document.querySelectorAll(".shorten-text");
+
+            tdElements.forEach(function (tdElement) {
+                var originalText = tdElement.textContent;
+                var truncatedText = originalText.substring(0, 50); // 调整字符范围
+                tdElement.textContent = truncatedText;
+                tdElement.title = originalText; // 将原始文本设置为标题
+            });
+        });
+        // JavaScript代码，用于处理全选/取消全选逻辑
+        document.getElementById('select-all').addEventListener('change', function () {
+            var checkboxes = document.getElementsByName('selected_items[]');
+            for (var i = 0; i < checkboxes.length; i++) {
+                checkboxes[i].checked = this.checked;
+            }
+        });
+    </script>
+{% endblock %}

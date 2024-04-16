@@ -1,0 +1,82 @@
+<script type="text/javascript" src="/static/js/jquery.slim.min.js"></script>
+<link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+<script src="/static/js/bootstrap.min.js"></script>
+<body style="background:url(static/images/wildlee.svg) no-repeat center; background-position: center 0; background-size: cover; margin: 1px;">
+
+<style>
+    .signin-container {
+        background: rgba(255, 255, 255, 0.2);
+        width: 480px;
+        margin: 0 auto;
+        margin-top: 15%;
+        padding: 42px 42px 39px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .button-container {
+        display: flex;
+        justify-content: space-between;
+    }
+</style>
+
+{% block content %}
+    <div class="signin-container" style="background-color: #e85629; opacity: 0.9; padding: 30px; border-radius: 10px;color: white;">
+            <form class="form-horizontal" method="post" action="{{ url_for('register') }}">
+                {% with success_messages = get_flashed_messages(category_filter='success') %}
+                    {% if success_messages %}
+                        <div class="alert alert-success">
+                            <ul>
+                                {% for message in success_messages %}
+                                    <li>{{ message }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                {% with error_messages = get_flashed_messages(category_filter='error') %}
+                    {% if error_messages %}
+                        <div class="alert alert-danger">
+                            <ul>
+                                {% for message in error_messages %}
+                                    <li>{{ message }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <div class="form-group row">
+                    <label for="inputUsername" class="col-sm-4 control-label">用户</label>
+                    <div class="col-sm-12">
+                        <input type="text" class="form-control" id="inputUsername" placeholder="username" name="username">
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="inputPassword" class="col-sm-4 control-label">密码</label>
+                    <div class="col-sm-12">
+                        <input type="password" class="form-control" id="inputPassword" placeholder="password" name="password">
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="inputConfirm" class="col-sm-4 control-label">重复</label>
+                    <div class="col-sm-12">
+                        <input type="password" class="form-control" id="inputConfirm" placeholder="confirm_password" name="confirm_password">
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="inputEmail" class="col-sm-4 control-label">邮件</label>
+                    <div class="col-sm-12">
+                        <input type="email" class="form-control" id="inputEmail" placeholder="email" name="email">
+                    </div>
+                </div>
+
+                <div class="button-container mt-4">
+                    <button type="submit" class="btn col-sm-4">注册</button>
+                    <button type="button" onclick="window.location='{{ url_for('login') }}'" class="btn col-sm-4">登录</button>
+                </div>
+            </form>
+        </div>
+{% endblock %}
