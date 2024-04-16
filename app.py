@@ -111,12 +111,11 @@ def update():
         # 添加可执行权限
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/hysteria2"])
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
+
         # 启动面板脚本
-        subprocess.run(["pkill", "-f", "app.py"])
+        logging.info("xos 项目更新成功")
         start_script_command = "/usr/local/xos/static/xos.sh"
         subprocess.run(start_script_command, shell=True)
-
-        logging.info("xos 项目更新成功")
         return redirect(url_for('dashboard', user=current_user))
 
     except Exception as e:

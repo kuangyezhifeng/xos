@@ -285,24 +285,26 @@ def is_xray_installed(remote_host):
         return False  # 命令执行失败，说明未安装 Xray
 
 
-def install_unzip():
+def install_unzip(remote_host):
     ubuntu_command = "sudo apt update && sudo apt-get install -y unzip"
     centos_command = "sudo yum install -y unzip"
 
-    # 通过 hostnamectl 获取更准确的信息
-    result = subprocess.run("hostnamectl", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # 执行 hostnamectl 命令获取更准确的信息
+    result = subprocess.run(["ssh", remote_host, "hostnamectl"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output = result.stdout.decode().lower()
 
     if 'ubuntu' in output or 'debian' in output:
         command = ubuntu_command
+        logging.info('目标主机是ubuntu系统')
     elif 'centos' in output or 'red hat' in output:
         command = centos_command
+        logging.info('目标主机是centos系统')
     else:
         # 未知的操作系统类型
         return False
 
     # 执行安装命令
-    result = subprocess.run(command, shell=True)
+    result = subprocess.run(["ssh", remote_host, command])
     if result.returncode == 0:
         return True
     else:
@@ -314,6 +316,18 @@ def remote_install_xray(remote_host):
     xray_config_path = "/usr/local/xray/config.json"
     # 尝试从GitHub下载
     try:
+        # 如果下载不成功，则使用本地复制文件的方法
+        download_cmd = "cp /usr/local/xos/static/xray.tar.gz ."
+        extract_cmd = f"tar -xzf xray.tar.gz -C {xray_extract_path}"
+        remove_cmd = "rm xray.tar.gz"
+        chmod_cmd = "chmod +x /usr/local/xray/xray"
+        # 设置权限的命令
+        setcap_cmd = "sudo setcap 'cap_net_bind_service=+ep' /usr/local/xray/xray"
+        # 合并并命令串
+        command = f"{download_cmd} && {extract_cmd} && {remove_cmd} && {setcap_cmd} && {chmod_cmd}"
+        subprocess.run([f"ssh {remote_host} '{command}'"], shell=True, check=True)
+
+    except subprocess.CalledProcessError:
         # 使用github下载的方法
         xray_url = "https://github.com/XTLS/Xray-core/releases/download/v1.8.10/Xray-linux-64.zip"
         download_cmd = f"curl -LO {xray_url}"
@@ -323,18 +337,6 @@ def remote_install_xray(remote_host):
         # 设置权限的命令
         setcap_cmd = "sudo setcap 'cap_net_bind_service=+ep' /usr/local/xray/xray"
         # 执行命令与合并命令串
-        command = f"{download_cmd} && {extract_cmd} && {remove_cmd} && {setcap_cmd} && {chmod_cmd}"
-        subprocess.run([f"ssh {remote_host} '{command}'"], shell=True, check=True)
-
-    except subprocess.CalledProcessError:
-        # 如果下载不成功，则使用本地复制文件的方法
-        download_cmd = "cp /usr/local/xos/static/xray.tar.gz ."
-        extract_cmd = f"tar -xzf xray.tar.gz -C {xray_extract_path}"
-        remove_cmd = "rm xray.tar.gz"
-        chmod_cmd = "chmod +x /usr/local/xray/xray"
-        # 设置权限的命令
-        setcap_cmd = "sudo setcap 'cap_net_bind_service=+ep' /usr/local/xray/xray"
-        # 合并并命令串
         command = f"{download_cmd} && {extract_cmd} && {remove_cmd} && {setcap_cmd} && {chmod_cmd}"
         subprocess.run([f"ssh {remote_host} '{command}'"], shell=True, check=True)
 
