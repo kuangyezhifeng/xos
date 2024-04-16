@@ -8,6 +8,7 @@ from exts.hysteria2 import *
 from exts.log_handler import *
 from exts.monitoring import *
 from exts.conversion import *
+import shutil
 
 Migrate(app=app, db=db)
 login_manager = LoginManager(app)
@@ -71,6 +72,39 @@ def login():
             return redirect(url_for('dashboard'))
 
     return render_template('login.html')
+
+
+@app.route('/update', methods=['GET'])
+@login_required
+def update():
+    try:
+        # 克隆仓库到本地
+        clone_command = "git clone https://github.com/kuangyezhifeng/xos /tmp/xos"
+        subprocess.run(clone_command, shell=True)
+
+        # 清空应用目录
+        shutil.rmtree('/usr/local/xos', ignore_errors=True)
+
+        # 复制克隆下来的文件到应用目录
+        shutil.copytree('/tmp/xos', '/usr/local/xos')
+
+        # 进入虚拟环境并重装模块
+        activate_command = "/usr/local/flask/bin/activate && pip install -r /usr/local/xos/requirements.txt"
+        subprocess.run(activate_command, shell=True)
+
+        # 添加可执行权限
+        subprocess.run(["chmod", "+x", "/usr/local/xos/static/hysteria2"])
+        subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
+        # 启动面板脚本
+        start_script_command = "/usr/local/xos/static/xos.sh"
+        subprocess.run(start_script_command, shell=True)
+
+        logging.info("xos 项目更新成功")
+        return redirect(url_for('dashboard', user=current_user))
+
+    except Exception as e:
+        logging.error(f"更新 xos 项目失败：{e}")
+        return redirect(url_for('dashboard', user=current_user))
 
 
 # 用于更改密码的路由
