@@ -78,6 +78,7 @@ def login():
 @login_required
 def update():
     try:
+        subprocess.run(["rm", "-rf", "/tmp/xos"])
         # 克隆仓库到本地
         clone_command = "git clone https://github.com/kuangyezhifeng/xos /tmp/xos"
         subprocess.run(clone_command, shell=True)
@@ -89,8 +90,8 @@ def update():
         shutil.copytree('/tmp/xos', '/usr/local/xos')
 
         # 进入虚拟环境并重装模块
-        activate_command = "/usr/local/flask/bin/activate && pip install -r /usr/local/xos/requirements.txt"
-        subprocess.run(activate_command, shell=True)
+        activate_command = "source /usr/local/flask/bin/activate && pip install -r /usr/local/xos/requirements.txt"
+        subprocess.run(activate_command, shell=True, executable="/bin/bash")
 
         # 添加可执行权限
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/hysteria2"])
