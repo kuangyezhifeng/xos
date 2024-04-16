@@ -112,6 +112,7 @@ def update():
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/hysteria2"])
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
         # 启动面板脚本
+        subprocess.run(["pkill", "-f", "app.py"])
         start_script_command = "/usr/local/xos/static/xos.sh"
         subprocess.run(start_script_command, shell=True)
 
