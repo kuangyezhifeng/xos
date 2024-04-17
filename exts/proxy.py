@@ -2,7 +2,6 @@
 from flask import redirect, url_for, flash
 from urllib.request import urlopen
 from base64 import urlsafe_b64decode
-from exts.socks import *
 from threading import Thread
 from app.models import *
 import subprocess
@@ -32,6 +31,55 @@ EXISTING_OUTBOUND_MESSAGE = "已存在相同的出站配置"
 
 test_result = {}
 
+
+def update_handler():
+    global update_in_progress
+    # 创建备份目录的路径
+    backup_dir_name = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
+    backup_dir_path = os.path.join('/xos', backup_dir_name)
+    try:
+        # 检查更新操作是否正在进行中，如果是则直接返回
+        if update_in_progress:
+            return
+
+        # 标记更新操作已开始
+        update_in_progress = True
+        # 如果备份目录不存在，则创建它
+        if not os.path.exists(backup_dir_path):
+            os.makedirs(backup_dir_path)
+
+        # 使用 rsync 命令备份源目录到备份目录，并替换目标目录中的文件
+        subprocess.run(["rsync", "-av", "--delete", "/usr/local/xos/", backup_dir_path])
+        logging.info(f"xos 备份成功，路径: {backup_dir_path}")
+
+        subprocess.run(["rm", "-rf", "/tmp/xos"])
+        # 克隆仓库到本地
+        clone_command = "git clone https://github.com/kuangyezhifeng/xos /tmp/xos"
+        subprocess.run(clone_command, shell=True)
+
+        # 执行系统命令 rsync，将 /tmp/xos 目录同步到 /usr/local/xos 目录，仅替换已存在的文件
+        subprocess.run(["rsync", "-av", "/tmp/xos/", "/usr/local/xos/"])
+
+        # 进入虚拟环境并重装模块
+        activate_command = "source /usr/local/flask/bin/activate && pip install -r /usr/local/xos/requirements.txt"
+        subprocess.run(activate_command, shell=True, executable="/bin/bash")
+
+        # 添加可执行权限
+        subprocess.run(["chmod", "+x", "/usr/local/xos/static/hysteria2"])
+        subprocess.run(["chmod", "+x", "/usr/local/xos/xray/xray"])
+        subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
+
+        # 启动面板脚本
+        start_script_command = "/usr/local/xos/static/xos.sh"
+        subprocess.Popen(start_script_command, shell=True)
+
+    except Exception as e:
+        logging.error(f"更新 xos 项目失败：{e}")
+
+    finally:
+        logging.info("xos 项目更新成功")
+        # 标记更新操作已完成
+        update_in_progress = False
 
 def create_chain_if_not_exists(table, chain):
     # 检查链是否存在

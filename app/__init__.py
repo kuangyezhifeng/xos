@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-# -*- coding: utf-8 -*-
 from flask import Flask
 from flask_bootstrap import Bootstrap
 from flask_login import LoginManager
-from exts import db
+from flask_socketio import SocketIO
 import settings
 from app.models import *
-import logging
-import sys
+
 
 def create_app():
     app = Flask(__name__, template_folder='../templates', static_folder='../static')
@@ -28,6 +26,9 @@ def create_app():
         # 返回对应于给定用户 ID 的用户对象
         return User.query.get(int(user_id))
 
+    # 初始化 SocketIO
+    socketio = SocketIO(app)
+
     # 推送应用上下文
     app.app_context().push()
 
@@ -35,4 +36,4 @@ def create_app():
     with app.app_context():
         db.create_all()
 
-    return app
+    return app, socketio

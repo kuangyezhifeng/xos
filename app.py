@@ -6,14 +6,72 @@ from flask_migrate import Migrate
 from exts.host import *
 from exts.hysteria2 import *
 from exts.log_handler import *
-from exts.monitoring import *
 from exts.conversion import *
-import shutil
+from app import create_app
+import psutil
+import threading
 
+app, socketio = create_app()
 Migrate(app=app, db=db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 PER_PAGE = 50
+
+realtime_data = {
+    'cpu': 0,
+    'memory': 0,
+    'upload': 0,
+    'download': 0
+}
+
+def get_system_data():
+    while True:
+        # 获取 CPU 使用率
+        cpu_percent = psutil.cpu_percent(interval=1)
+
+        # 获取内存使用率
+        memory_percent = psutil.virtual_memory().percent
+
+        # 获取所有网络接口的流量统计信息
+        network_stats = psutil.net_io_counters(pernic=True)
+
+        # 计算实时上传和下载速度，排除回环接口（lo）
+        upload_speed = 0
+        download_speed = 0
+        for interface, stats in network_stats.items():
+            if interface != 'lo':  # 排除回环接口
+                upload_speed += stats.bytes_sent
+                download_speed += stats.bytes_recv
+
+        # 在适当的地方等待一段时间
+        time.sleep(1)
+
+        # 再次获取网络流量统计信息
+        network_stats2 = psutil.net_io_counters(pernic=True)
+        upload_speed2 = 0
+        download_speed2 = 0
+        for interface, stats in network_stats2.items():
+            if interface != 'lo':  # 排除回环接口
+                upload_speed2 += stats.bytes_sent
+                download_speed2 += stats.bytes_recv
+
+        # 计算实时上传和下载速度
+        upload_speed = (upload_speed2 - upload_speed) / 1  # 1 秒的时间间隔
+        download_speed = (download_speed2 - download_speed) / 1
+
+        # 更新实时数据
+        realtime_data['cpu'] = int(cpu_percent)
+        realtime_data['memory'] = int(memory_percent)
+        realtime_data['upload'] = int(upload_speed)
+        realtime_data['download'] = int(download_speed)
+
+        # 向前端推送实时数据
+        socketio.emit('update_realtime_data', realtime_data)
+
+# SocketIO 事件，用于向前端发送实时数据
+@socketio.on('get_realtime_data')
+def get_realtime_data():
+    socketio.emit('update_realtime_data', realtime_data)
 
 
 # 用户加载回调函数
@@ -77,50 +135,10 @@ def login():
 @app.route('/update', methods=['GET'])
 @login_required
 def update():
-    # 创建备份目录的路径
-    backup_dir_name = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
-    backup_dir_path = os.path.join('/xos', backup_dir_name)
-
-    try:
-        # 如果备份目录不存在，则创建它
-        if not os.path.exists(backup_dir_path):
-            os.makedirs(backup_dir_path)
-
-        # 使用 rsync 命令备份源目录到备份目录，并替换目标目录中的文件
-        subprocess.run(["rsync", "-av", "--delete", "/usr/local/xos/", backup_dir_path])
-        logging.info(f"xos 备份成功，路径: {backup_dir_path}")
-
-    except FileExistsError:
-        logging.warning(f"备份目录 {backup_dir_path} 已存在，忽略备份操作")
-    except Exception as e:
-        logging.error(f"备份 xos 项目失败：{e}")
-
-    try:
-        subprocess.run(["rm", "-rf", "/tmp/xos"])
-        # 克隆仓库到本地
-        clone_command = "git clone https://github.com/kuangyezhifeng/xos /tmp/xos"
-        subprocess.run(clone_command, shell=True)
-
-        # 执行系统命令 rsync，将 /tmp/xos 目录同步到 /usr/local/xos 目录，仅替换已存在的文件
-        subprocess.run(["rsync", "-av", "/tmp/xos/", "/usr/local/xos/"])
-
-        # 进入虚拟环境并重装模块
-        activate_command = "source /usr/local/flask/bin/activate && pip install -r /usr/local/xos/requirements.txt"
-        subprocess.run(activate_command, shell=True, executable="/bin/bash")
-
-        # 添加可执行权限
-        subprocess.run(["chmod", "+x", "/usr/local/xos/static/hysteria2"])
-        subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
-
-        # 启动面板脚本
-        logging.info("xos 项目更新成功")
-        start_script_command = "/usr/local/xos/static/xos.sh"
-        subprocess.run(start_script_command, shell=True)
-        return redirect(url_for('dashboard', user=current_user))
-
-    except Exception as e:
-        logging.error(f"更新 xos 项目失败：{e}")
-        return redirect(url_for('dashboard', user=current_user))
+    # 启动一个新线程执行更新操作
+    threading.Thread(target=update_handler).start()
+    # 重定向到 dashboard 页面
+    return redirect(url_for('dashboard', user=current_user))
 
 
 # 用于更改密码的路由
@@ -1316,5 +1334,8 @@ def copy_record(id):
 
 if __name__ == '__main__':
     # app.run(port=80, host="0.0.0.0")
+    # 启动获取系统数据的线程
+    data_thread = threading.Thread(target=get_system_data)
+    data_thread.start()
     socketio.run(app, port=80, host="0.0.0.0")
     # socketio.run(app, port=8000, host="localhost")
