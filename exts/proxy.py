@@ -16,7 +16,6 @@ import ipaddress
 import logging
 import socket
 
-
 # Configure logging
 logging.basicConfig(filename='/var/log/xos.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -68,16 +67,17 @@ def update_handler():
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/hysteria2"])
         subprocess.run(["chmod", "+x", "/usr/local/xos/xray/xray"])
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
-
         # 启动面板脚本
         start_script_command = "/usr/local/xos/static/xos.sh"
         subprocess.Popen(start_script_command, shell=True)
 
     except Exception as e:
         logging.error(f"更新 xos 项目失败：{e}")
-
     finally:
         logging.info("xos 项目更新成功")
+        # 启动面板脚本
+        start_script_command = "/usr/local/xos/static/xos.sh"
+        subprocess.Popen(start_script_command, shell=True)
         # 标记更新操作已完成
         update_in_progress = False
 
