@@ -15,7 +15,6 @@ import random
 import ipaddress
 import logging
 import socket
-import multiprocessing
 
 # Configure logging
 logging.basicConfig(filename='/var/log/xos.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,17 +30,6 @@ EXISTING_OUTBOUND_MESSAGE = "已存在相同的出站配置"
 
 test_result = {}
 update_in_progress = False
-
-
-
-
-
-# 启动进程函数
-def start_process():
-    # 启动面板脚本的命令
-    start_script_command = "/usr/local/xos/static/xos.sh"
-    process = subprocess.Popen(start_script_command, shell=True)
-    logging.info("xos面板重启完成")
 
 def update_handler():
     global update_in_progress
@@ -84,9 +72,10 @@ def update_handler():
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
         logging.info("xray hysteria2 程序权限修改完毕")
 
-        # 创建启动进程的进程
-        start_process_process = multiprocessing.Process(target=start_process)
-        start_process_process.start()
+        # 创建一个at任务，延迟5秒执行xos.sh脚本
+        command = 'echo "/usr/local/xos/static/xos.sh" | at now + 1 minutes'
+        subprocess.run(command, shell=True)
+        logging.info("xos面板重启完成")
 
     except Exception as e:
         logging.error(f"更新 xos 项目失败：{e}")
