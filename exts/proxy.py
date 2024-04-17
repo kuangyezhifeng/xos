@@ -30,7 +30,7 @@ INVALID_URL_MESSAGE = "无效的连接URL"
 EXISTING_OUTBOUND_MESSAGE = "已存在相同的出站配置"
 
 test_result = {}
-
+update_in_progress = False
 
 def update_handler():
     global update_in_progress
