@@ -12,12 +12,21 @@ import os
 import random
 import logging
 import string
+import paramiko
 
 # Configure logging
 logging.basicConfig(filename='/var/log/xos.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 # 定义路径变量
 LOCAL_PATH = "/usr/local/xos/static/config"
 CHECK_PATH = '/usr/local/xos/xray/xray-check.json'
+XRAY_EXTRACT_PATH = "/usr/local/"
+XRAY_SYMLINK_PATH = "/usr/sbin/xray"
+XRAY_CONFIG_PATH = "/usr/local/xray/config.json"
+LOCAL_XRAY_FILE = "/usr/local/xos/static/xray.tar.gz"
+XRAY_EXEC_FILE = "/usr/local/xray/xray"
+TMP_XRAY_FILE = "/tmp/xray.tar.gz"
+TMP = "/tmp"
+XRAY_GITHUB_URI = "https://github.com/XTLS/Xray-core/releases/download/v1.8.10/Xray-linux-64.zip"
 gltest_result = {}
 
 
@@ -260,98 +269,171 @@ def get_remote_ip_addresses(host, username, private_key_path=None, timeout=5):
         logging.error(f"获取远程服务器 {host} IP 地址失败: {e}")
 
 
-
-def is_xray_installed(remote_host):
-    check_cmd = "xray -version"
-    full_cmd = f"ssh {remote_host} '{check_cmd}'"
-    try:
-        # 记录完整的命令
-        logging.info(f"执行命令: {full_cmd}")
-
-        # 使用 subprocess.run 执行命令，捕获异常
-        result = subprocess.run([full_cmd], check=True, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE, shell=True)
-
-        # 检查命令执行结果中是否包含 Xray 版本信息
-        if "Xray" in result.stdout.decode():
-            logging.info("Xray 已安装在远程主机上。")
-            return True
-        else:
-            logging.info("Xray 未安装在远程主机上。")
-            return False
-
-    except subprocess.CalledProcessError:
-        logging.error("执行命令以检查 Xray 安装时出错。")
-        return False  # 命令执行失败，说明未安装 Xray
-
-
-def install_unzip(remote_host):
-    ubuntu_command = "sudo apt update && sudo apt-get install -y unzip"
-    centos_command = "sudo yum install -y unzip"
-
+def remote_install_unzip(ssh_client):
     # 执行 hostnamectl 命令获取更准确的信息
-    result = subprocess.run(["ssh", remote_host, "hostnamectl"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output = result.stdout.decode().lower()
+    stdin, stdout, stderr = ssh_client.exec_command("hostnamectl")
+    output = stdout.read().decode().lower()
 
+    # 根据操作系统类型选择安装命令
     if 'ubuntu' in output or 'debian' in output:
-        command = ubuntu_command
-        logging.info('目标主机是ubuntu系统')
+        command = "sudo apt update && sudo apt-get install -y unzip"
+        logging.info('远程ubuntu系统安装unzip......')
+
     elif 'centos' in output or 'red hat' in output:
-        command = centos_command
-        logging.info('目标主机是centos系统')
+        command = "sudo yum install -y unzip"
+        logging.info('远程centos系统安装unzip......')
+
     else:
         # 未知的操作系统类型
         return False
 
     # 执行安装命令
-    result = subprocess.run(["ssh", remote_host, command])
-    if result.returncode == 0:
+    stdin, stdout, stderr = ssh_client.exec_command(command)
+    return True
+
+
+def get_xray_status(ssh_client):
+    # 检查 Xray 版本
+    check_cmd = "xray -version"
+    stdin, stdout, stderr = ssh_client.exec_command(check_cmd)
+
+    # 读取命令执行结果
+    output = stdout.read().decode().strip()
+    error = stderr.read().decode().strip()
+
+    # 检查命令执行结果中是否包含 Xray 版本信息
+    if "Xray" in output:
+        logging.info("Xray 已安装在远程主机上。")
         return True
     else:
+        logging.info("Xray 未安装在远程主机上。")
         return False
 
-def remote_install_xray(remote_host):
-    xray_extract_path = "/usr/local/xray"
-    xray_symlink_path = "/usr/sbin/xray"
-    xray_config_path = "/usr/local/xray/config.json"
-    # 尝试从GitHub下载
+
+def get_country_code(ssh_client):
+    command = "curl ipinfo.io"
+    stdin, stdout, stderr = ssh_client.exec_command(command)
+    output = stdout.read().decode()
+
+    if re.search(r'\bCN\b', output):
+        logging.info("中国服务器启用本地复制文件安装")
+        return "CN"
+    else:
+        logging.info("国外服务器启用GITHUB下载安装程序")
+        return "Foreign"
+
+
+def sync_xray_config(ssh_client,xray_config):
     try:
-        # 如果下载不成功，则使用本地复制文件的方法
-        download_cmd = "cp /usr/local/xos/static/xray.tar.gz ."
-        extract_cmd = f"tar -xzf xray.tar.gz -C {xray_extract_path}"
-        remove_cmd = "rm xray.tar.gz"
+        ftp = ssh_client.open_sftp()
+        ftp.put(xray_config, XRAY_CONFIG_PATH)
+        ftp.close()
+        logging.info(f"已将文件从本地 {xray_config} 复制到远程服务器的 {XRAY_CONFIG_PATH}")
+        return True
+
+    except Exception as e:
+        logging.error(f"将文件从本地 {xray_config} 复制到远程服务器的 {XRAY_CONFIG_PATH} 时出现错误: {e}")
+        return False
+
+
+def restart_remote_xray(ssh_client):
+    try:
+        restart_command = "systemctl restart xray.service"
+        stdin, stdout, stderr = ssh_client.exec_command(restart_command)
+        if stdout.channel.recv_exit_status() == 0:
+            logging.info("Xray服务重启成功。")
+            return True
+        else:
+            logging.error("Xray服务重启失败。")
+            return False
+
+    except Exception as e:
+        logging.error(f"Xray服务重启时出现错误: {e}")
+        return False
+
+def restart_remote_xray_service(ssh_client):
+    try:
+        restart_command = "systemctl restart xray.service"
+        stdin, stdout, stderr = ssh_client.exec_command(restart_command)
+        if stdout.channel.recv_exit_status() == 0:
+            logging.info("Xray服务重启成功。")
+            return True
+        else:
+            logging.error("Xray服务重启失败。")
+            return False
+
+    except Exception as e:
+        logging.error(f"Xray服务重启时出现错误: {e}")
+        return False
+
+
+def china_install_xray(ssh_client):
+    # 连接 SFTP 客户端
+    sftp = ssh_client.open_sftp()
+    try:
+        # 将本地文件复制到远程服务器
+        sftp.put(LOCAL_XRAY_FILE, TMP_XRAY_FILE)
+        # 执行解压、权限设置等操作
+        mkdir_cmd = "mkdir -p /usr/local/xray"
+        extract_cmd = f"tar -xzf {TMP_XRAY_FILE} -C {XRAY_EXTRACT_PATH}"
+        remove_cmd = f"rm {TMP_XRAY_FILE}"
         chmod_cmd = "chmod +x /usr/local/xray/xray"
         # 设置权限的命令
         setcap_cmd = "sudo setcap 'cap_net_bind_service=+ep' /usr/local/xray/xray"
-        # 合并并命令串
-        command = f"{download_cmd} && {extract_cmd} && {remove_cmd} && {setcap_cmd} && {chmod_cmd}"
-        subprocess.run([f"ssh {remote_host} '{command}'"], shell=True, check=True)
 
-    except subprocess.CalledProcessError:
-        # 使用github下载的方法
-        xray_url = "https://github.com/XTLS/Xray-core/releases/download/v1.8.10/Xray-linux-64.zip"
-        download_cmd = f"curl -LO {xray_url}"
-        extract_cmd = f"unzip -o Xray-linux-64.zip -d {xray_extract_path}"
+        # 合并并命令串
+        command = f"{mkdir_cmd} && {extract_cmd} && {remove_cmd} && {setcap_cmd} && {chmod_cmd}"
+        stdin, stdout, stderr = ssh_client.exec_command(command)
+
+        if stdout.channel.recv_exit_status() != 0:
+            logging.error(f"远程服务器安装 Xray 失败")
+        else:
+            logging.info(f"远程服务器安装Xray成功")
+
+        # 创建符号链接
+        symlink_cmd = f"ln -s {XRAY_EXEC_FILE} {XRAY_SYMLINK_PATH}"
+        ssh_client.exec_command(symlink_cmd)
+
+    finally:
+        # 关闭 SFTP 客户端连接
+        sftp.close()
+
+def foreign_install_xray(ssh_client):
+    if remote_install_unzip(ssh_client):
+        mkdir_cmd = "mkdir -p /usr/local/xray"
+        download_cmd = f"curl -LO {XRAY_GITHUB_URI}"
+        extract_cmd = f"unzip -o Xray-linux-64.zip -d /usr/local/xray"
         remove_cmd = "rm Xray-linux-64.zip"
         chmod_cmd = "chmod +x /usr/local/xray/xray"
         # 设置权限的命令
         setcap_cmd = "sudo setcap 'cap_net_bind_service=+ep' /usr/local/xray/xray"
         # 执行命令与合并命令串
-        command = f"{download_cmd} && {extract_cmd} && {remove_cmd} && {setcap_cmd} && {chmod_cmd}"
-        subprocess.run([f"ssh {remote_host} '{command}'"], shell=True, check=True)
+        command = f"{mkdir_cmd};{download_cmd} && {extract_cmd} && {remove_cmd} && {setcap_cmd} && {chmod_cmd}"
+        stdin, stdout, stderr = ssh_client.exec_command(command)
 
-    # Create symlink
-    symlink_cmd = f"ln -s {os.path.join(xray_extract_path, 'xray')} {xray_symlink_path}"
-    subprocess.run([f"ssh {remote_host} '{symlink_cmd}'"], shell=True)
+        if stdout.channel.recv_exit_status() != 0:
+            error_message = stderr.read().decode()
+            logging.error(f"远程服务器安装 Xray 失败: {error_message}")
+            raise Exception(f"Failed to install Xray: {error_message}")
+        else:
+            logging.info(f"远程服务器安装Xray成功")
 
-    # Create Xray systemd service
+        # 创建符号链接
+        symlink_cmd = f"ln -s {XRAY_EXEC_FILE} {XRAY_SYMLINK_PATH}"
+        ssh_client.exec_command(symlink_cmd)
+    else:
+        logging.error("unzip 安装错误")
+
+
+def remote_xray_service_write(ssh_client):
+    # 创建 Xray systemd 服务
     service_content = f"""
 [Unit]
 Description=Xray Service
 After=network.target
 
 [Service]
-ExecStart={os.path.join(xray_extract_path, 'xray')} -config {xray_config_path}
+ExecStart={XRAY_EXEC_FILE} -config {XRAY_CONFIG_PATH}
 Restart=on-failure
 User=nobody
 RestartSec=3
@@ -362,49 +444,20 @@ WantedBy=multi-user.target
 """
     with open("xray.service", "w") as service_file:
         service_file.write(service_content)
-    subprocess.run([f"scp xray.service {remote_host}:/etc/systemd/system/xray.service"], shell=True)
 
-    # Reload systemd and start Xray service
-    subprocess.run([
-        f"ssh {remote_host} 'systemctl daemon-reload && systemctl start xray.service && systemctl enable "
-        f"xray.service'"],
-        shell=True)
+    # 上传 Xray 服务文件
+    ftp = ssh_client.open_sftp()
+    ftp.put("xray.service", "/etc/systemd/system/xray.service")
+    ftp.close()
 
-    return True
+    # 重载 systemd 并启动 Xray 服务
+    reload_start_cmd = "systemctl daemon-reload && systemctl start xray.service && systemctl enable xray.service"
+    stdin, stdout, stderr = ssh_client.exec_command(reload_start_cmd)
+    if stdout.channel.recv_exit_status() != 0:
+        logging.error("远程xray设置系统服务错误")
 
+    logging.info("远程xray设置系统服务成功")
 
-def copy_file_to_remote_scp(local_path, remote_host, remote_path, username='root', password=None, timeout=10):
-    if password:
-        # 如果提供了密码，使用它进行身份验证
-        password = escape_password(password)
-        scp_command = (f"sshpass -p '{password}' scp -o StrictHostKeyChecking=no -o ConnectTimeout={timeout} "f"{local_path}{username}@{remote_host}:{remote_path}")
-
-    else:
-        # 如果没有提供密码，则假设设置了基于密钥的身份验证
-        scp_command = (f"scp -o StrictHostKeyChecking=no -o ConnectTimeout={timeout} {local_path} {username}"
-                       f"@{remote_host}:{remote_path}")
-
-    result = subprocess.run(scp_command, shell=True)
-
-    if result.returncode == 0:
-        logging.info(f"xray 配置文件复制到远程服务器{remote_host}成功")
-        return True
-
-    else:
-        logging.error(f"xray 配置文件复制到远程服务器{remote_host}失败")
-        logging.error(f"{scp_command}")
-        return False
-
-
-def restart_remote_xray_service(remote_host):
-    restart_command = f"ssh {remote_host} 'systemctl restart xray.service'"
-    restart_result = subprocess.run([restart_command], shell=True)
-
-    if restart_result.returncode == 0:
-        logging.info("Xray服务重启成功。")
-        return True
-    else:
-        return False
 
 
 # 生成单个vmess配置和vmess URI
@@ -642,64 +695,46 @@ def generate_and_save_configs(host_ip):
     # 构建文件名，格式为 IP_月日时_config.json
     current_time = datetime.now().strftime("%m%d%H")
     # 使用 os.path.join() 来组合路径和文件名
-    filename = os.path.join(LOCAL_PATH, f"{host_ip}_{current_time}_config.json")
+    xray_config_file = os.path.join(TMP, f"{host_ip}_{current_time}_config.json")
 
     # 保存 xray_config 到文件
-    save_xray_config(xray_config, filename)
+    save_xray_config(xray_config, xray_config_file)
 
-    return filename
+    return xray_config_file
 
 
 def xray_remote_service_handler(remote_host):
-    remote_path = "/usr/local/xray/config.json"
+    # 连接远程服务器
+    try:
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(hostname=remote_host)
 
-    # 安装或检查 Xray
-    xray_installed = False
-    for _ in range(5):
-        if is_xray_installed(remote_host):
-            xray_installed = True
-            logging.info("检测到远程服务器已经安装 Xray 程序....")
-            break
+        # 检查Xray安装状态
+        if get_xray_status(ssh_client):
+            pass
         else:
-            logging.info("未检测到 Xray 服务程序, 稍后重新检测...")
-            time.sleep(1)
-
-    if not xray_installed:
-        for _ in range(5):
-            if install_unzip(remote_host):
-                logging.info("远程主机安装 unzip 成功")
-                break
+            # 根据国家安装Xray
+            result = get_country_code(ssh_client)
+            if result == "CN":
+                china_install_xray(ssh_client)
             else:
-                time.sleep(1)
+                foreign_install_xray(ssh_client)
 
-        for _ in range(5):
-            if remote_install_xray(remote_host):
-                xray_installed = True
-                logging.info("远程主机安装 Xray 成功")
-                break
-            else:
-                logging.info("远程主机安装 Xray 失败，稍后进行安装...")
-                time.sleep(1)
+            # 写入远程Xray服务配置文件
+            remote_xray_service_write(ssh_client)
 
-    # 生成和保存配置文件
-    filename = generate_and_save_configs(remote_host)
+        # 生成和保存配置文件
+        xray_config_file = generate_and_save_configs(remote_host)
+        sync_xray_config(ssh_client, xray_config_file)
 
-    # 复制配置文件到远程服务器
-    if filename:
-        for _ in range(5):
-            if copy_file_to_remote_scp(filename, remote_host, remote_path):
-                break
-            else:
-                logging.info("复制文件到远程服务器失败，稍后重试...")
-                time.sleep(1)
+        # 重启远程Xray服务
+        restart_remote_xray(ssh_client)
 
-    # 重启远程 Xray 服务
-    for _ in range(5):
-        if restart_remote_xray_service(remote_host):
-            break
-        else:
-            logging.info("重启远程 Xray 服务失败，稍后重试...")
-            time.sleep(1)
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        ssh_client.close()
 
 
 def batch_proxies_set(protocol, addresses, port='10808', account=None, password=None):
