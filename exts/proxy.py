@@ -54,30 +54,32 @@ def update_handler():
         subprocess.run(["rm", "-rf", "/tmp/xos"])
         # 克隆仓库到本地
         clone_command = "git clone https://github.com/kuangyezhifeng/xos /tmp/xos"
+        logging.info("已克隆更新文件至本地")
         subprocess.run(clone_command, shell=True)
 
         # 执行系统命令 rsync，将 /tmp/xos 目录同步到 /usr/local/xos 目录，仅替换已存在的文件
         subprocess.run(["rsync", "-av", "/tmp/xos/", "/usr/local/xos/"])
+        logging.info("xos文件更新已完成")
 
         # 进入虚拟环境并重装模块
         activate_command = "source /usr/local/flask/bin/activate && pip install -r /usr/local/xos/requirements.txt"
         subprocess.run(activate_command, shell=True, executable="/bin/bash")
+        logging.info("flask模块检查并安装完毕")
 
         # 添加可执行权限
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/hysteria2"])
         subprocess.run(["chmod", "+x", "/usr/local/xos/xray/xray"])
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
+        logging.info("xray hysteria2 程序权限修改完毕")
         # 启动面板脚本
-        start_script_command = "/usr/local/xos/static/xos.sh"
+        start_script_command = "pkill -f app.py;/usr/local/xos/static/xos.sh"
+        logging.info("xos应用重新启动完成")
         subprocess.Popen(start_script_command, shell=True)
 
     except Exception as e:
         logging.error(f"更新 xos 项目失败：{e}")
     finally:
         logging.info("xos 项目更新成功")
-        # 启动面板脚本
-        start_script_command = "/usr/local/xos/static/xos.sh"
-        subprocess.Popen(start_script_command, shell=True)
         # 标记更新操作已完成
         update_in_progress = False
 
