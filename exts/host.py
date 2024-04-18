@@ -289,7 +289,15 @@ def remote_install_unzip(ssh_client):
 
     # 执行安装命令
     stdin, stdout, stderr = ssh_client.exec_command(command)
-    return True
+    # 等待命令执行完成
+    exit_status = stdout.channel.recv_exit_status()
+
+    # 如果命令执行成功（退出状态码为0），返回True，否则返回False
+    if exit_status == 0:
+        return True
+    else:
+        return False
+
 
 
 def get_xray_status(ssh_client):
