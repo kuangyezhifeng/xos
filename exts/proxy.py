@@ -72,7 +72,7 @@ def update_handler():
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
         logging.info("xray hysteria2 程序权限修改完毕")
 
-        # 创建一个at任务，延迟5秒执行xos.sh脚本
+        # 创建一个at任务，延迟1分执行xos.sh脚本
         command = 'echo "/usr/local/xos/static/xos.sh" | at now + 1 minutes'
         subprocess.run(command, shell=True)
         logging.info("xos面板重启完成")
@@ -208,8 +208,6 @@ def reset_transparent_proxy_config():
 
     # 添加xray用户安装hysteria2程序
     xray_useradd()
-    install_hysteria2()
-
 
 def xray_useradd():
     # 定义 xray 用户名
@@ -275,6 +273,124 @@ def set_config(proxies):
         set_tag(proxies)
 
 
+def switch_proxy_mode(mode):
+    if mode == "local":
+        sed_command = ['sed', '-i', 's/^#*net\.ipv4\.ip_forward.*/net.ipv4.ip_forward = 1/', '/etc/sysctl.conf']
+        sed_process = subprocess.run(sed_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(['iptables', '-F', '-t', 'mangle'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        Xos_config.query.update({"proxy_mode": False})
+    else:
+        sed_command = ['sed', '-i', 's/^#*net\.ipv4\.ip_forward.*/net.ipv4.ip_forward = 0/', '/etc/sysctl.conf']
+        sed_process = subprocess.run(sed_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        create_fwmark_rule_and_local_route()
+        reset_transparent_proxy_config()
+        Xos_config.query.update({"proxy_mode": True})
+
+    # 如果 sed 命令执行成功，则继续执行 sysctl 命令
+    if sed_process.returncode == 0:
+        sysctl_process = subprocess.run(['sysctl', '-p'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # 如果 sysctl 命令也执行成功，则提交数据库更改
+        if sysctl_process.returncode == 0:
+            logging.info('sysctl 命令执行成功')
+            # 提交修改到数据库
+            db.session.commit()
+            logging.info(f'切换代理模式{mode}成功')
+        else:
+            logging.error('切换代理模式{mode}失败')
+
+
+def switch_proxy_share(proxy_share):
+    share_config = [
+        {
+            "port": 1987,
+            "protocol": "vmess",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "57969d78-64a6-4aed-dcb9-94c2296cabfd",
+                        "alterId": 0
+                    }
+                ],
+                "disableInsecureEncryption": False
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "none",
+                "tcpSettings": {
+                    "header": {
+                        "type": "none"
+                    }
+                }
+            },
+            "tag": "vmess",
+            "sniffing": {
+                "enabled": True,
+                "destOverride": [
+                    "http",
+                    "tls"
+                ]
+            }
+        },
+        {
+            "port": 1988,
+            "protocol": "socks",
+            "settings": {
+                "auth": "noauth",
+                "udp": True
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "none",
+                "tcpSettings": {
+                    "header": {
+                        "type": "none"
+                    }
+                }
+            },
+            "sniffing": {
+                "enabled": True,
+                "destOverride": ["http", "tls"]
+            }
+        }
+    ]
+    # 先加载当前的 xray 配置
+    xray_config = load_xray_config(CONFIG_PATH)
+
+    # 如果要启用分享代理
+    if proxy_share == "enable":
+        # 检查要添加的配置是否已存在
+        for config in share_config:
+            if config not in xray_config["inbounds"]:
+                # 如果不存在，则将其添加到 xray 配置中
+                xray_config["inbounds"].append(config)
+        # 更新数据库中的代理分享字段为 True
+        Xos_config.query.update({"proxy_share": True})
+        db.session.commit()
+        logging.info("启用局域网分享成功")
+
+    else:
+        for config in share_config:
+            if config in xray_config["inbounds"]:
+                xray_config["inbounds"].remove(config)
+
+        Xos_config.query.update({"proxy_share": False})
+        db.session.commit()
+        logging.info("禁用局域网分享成功")
+
+    save_xray_config(xray_config, CONFIG_PATH)
+
+def set_page_number(number):
+    # 构造 sed 命令
+    sed_command = "sed -i 's/PER_PAGE = .*/PER_PAGE = {}/g' /usr/local/xos/app.py".format(number)
+    subprocess.run(sed_command, shell=True)
+
+    at_command = 'echo "/usr/local/xos/static/xos.sh" | at now + 1 minutes'
+    subprocess.run(at_command, shell=True)
+
+    # 执行数据库更新操作
+    Xos_config.query.update({"page_rows": number})
+    db.session.commit()
+    logging.info("设置页数显示行数完成,等待重启XOS面板")
 
 
 # 批量测试判断端口有无在本地使用
@@ -295,30 +411,6 @@ def is_local_port_in_use(port):
         return False
     # 如果没有找到监听端口的行，则返回False
     return False
-
-
-
-def install_hysteria2():
-    # 定义目标目录和文件
-    config_dir = '/etc/hysteria2'
-    target_binary = '/usr/bin/hysteria2'
-
-    # 检查配置目录是否存在，不存在则创建
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
-        logging.info(f'创建目录: {config_dir}')
-    else:
-        logging.info(f'目录已存在: {config_dir}')
-
-    # 使用系统命令复制程序文件到目标目录
-    source_binary = '/usr/local/xos/static/hysteria2'
-    subprocess.run(['cp', source_binary, target_binary])
-    logging.info(f'复制 {source_binary} 到 {target_binary}')
-
-    # 赋予可执行权限
-    subprocess.run(['chmod', '755', target_binary])
-    logging.info(f'修改权限为可执行: {target_binary}')
-
 
 def reset_xray_services():
     # 使用 os.system 创建文件夹

@@ -24,7 +24,7 @@ class Config:
 
 class DevelopmentConfig(Config):
     ENV = 'development'
-    DEBUG = False
+    DEBUG = True
 
 
 class ProductionConfig(Config):

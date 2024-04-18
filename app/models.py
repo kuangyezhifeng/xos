@@ -102,3 +102,11 @@ class Conver(db.Model):
     tag = db.Column(db.String(length=15))
     status = db.Column(db.String(255))
     flag = db.Column(db.Integer)
+
+
+class Xos_config(db.Model):
+    __tablename__ = 'xos_config'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    proxy_mode = db.Column(db.Boolean)  # 代理模式，True表示启用，False表示禁用
+    proxy_share = db.Column(db.Boolean)  # 分享代理，字符串类型，最大长度为255个字符
+    page_rows = db.Column(db.Integer)

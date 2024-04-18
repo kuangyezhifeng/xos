@@ -270,6 +270,31 @@ def gateway_select():
         return redirect(url_for('dashboard', user=current_user))
 
 
+@app.route('/xos_config', methods=['GET', 'POST'])
+@login_required
+def xos_config():
+    if request.method == 'GET':
+        # 查询数据库中的配置信息
+        config = Xos_config.query.first()
+        return render_template('xos_set.html', user=current_user,config=config)
+
+    elif request.method == 'POST':
+        # 获取代理模式的选择值
+        proxy_mode = request.form.get('proxy_mode')
+        if proxy_mode:
+            switch_proxy_mode(proxy_mode)
+        # 获取代理分享的选择值
+        proxy_share = request.form.get('proxy_share')
+        if proxy_share:
+            switch_proxy_share(proxy_share)
+
+        # 获取页面行数的选择值
+        page_rows = request.form.get('page_rows')
+        if page_rows:
+            set_page_number(page_rows)
+
+        return redirect(url_for('dashboard', user=current_user))
+
 """
 
 proxy_add 路由处理函数
@@ -341,15 +366,6 @@ def node_on_off():
             proxies = ProxyDevice.query.get(id)
             set_config(proxies)
 
-    return redirect(url_for('dashboard'))
-
-
-@app.route('/proxy_share', methods=['GET', 'POST'])
-@login_required
-def proxy_share():
-    # 根据ID查询主IP信息
-    if request.method == 'GET':
-        proxy_lan_share()
     return redirect(url_for('dashboard'))
 
 
