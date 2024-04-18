@@ -76,10 +76,12 @@ def update_handler():
         command = 'echo "/usr/local/xos/static/xos.sh" | at now + 1 minutes'
         subprocess.run(command, shell=True)
         logging.info("xos面板重启完成")
+        subprocess.run("pkill -f app.py", shell=True)
 
     except Exception as e:
         logging.error(f"更新 xos 项目失败：{e}")
     finally:
+        subprocess.run("pkill -f app.py", shell=True)
         logging.info("xos 项目更新成功")
         # 标记更新操作已完成
         update_in_progress = False
