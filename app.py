@@ -276,6 +276,13 @@ def xos_config():
     if request.method == 'GET':
         # 查询数据库中的配置信息
         config = Xos_config.query.first()
+
+        # 如果数据库中没有配置信息，则插入一条默认记录
+        if not config:
+            default_config = Xos_config()
+            db.session.add(default_config)
+            db.session.commit()
+            config = default_config
         return render_template('xos_set.html', user=current_user,config=config)
 
     elif request.method == 'POST':
