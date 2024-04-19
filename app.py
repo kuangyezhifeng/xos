@@ -7,6 +7,7 @@ from exts.host import *
 from exts.hysteria2 import *
 from exts.log_handler import *
 from exts.conversion import *
+from sqlalchemy import desc
 from app import create_app
 import psutil
 import threading
@@ -180,7 +181,9 @@ def dashboard():
     user = current_user
     page = request.args.get('page', 1, type=int)
 
-    proxies = ProxyDevice.query.paginate(page, per_page=PER_PAGE)
+    # 修改查询以按照指定顺序排序
+    proxies = ProxyDevice.query.order_by(ProxyDevice.gateway.desc(), ProxyDevice.status).paginate(page,
+                                                                                                  per_page=PER_PAGE)
 
     return render_template('dashboard.html', user=user, proxies=proxies)
 
