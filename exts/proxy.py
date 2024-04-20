@@ -2698,13 +2698,15 @@ def xray_proxies_info_handler(selected_items):
     result = {}
     global test_result
     test_result.clear()
-
+    # 存储已经生成的端口号
+    used_ports = set()
     for proxies_id in selected_items:
         # tag = generate_tag()  #不生成TAG,直接使用现有库中的TAG值
         # 生成端口号并检查是否重复
         while True:
             port = random.randint(1024, 65534)
-            if not is_local_port_in_use(port):
+            if port not in used_ports and not is_local_port_in_use(port):
+                used_ports.add(port)
                 break
         proxies = ProxyDevice.query.filter_by(id=proxies_id).first()
         protocol = proxies.protocol

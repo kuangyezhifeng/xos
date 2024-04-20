@@ -16,6 +16,8 @@ from exts.proxy import decode_proxy_link,generate_node_outbound
 
 CHECK_PATH = '/usr/local/xos/xray/xray-check.json'
 XRAY_CHECK = '/etc/systemd/system/xray-check.service'
+# 文件保存已经生成的端口号的路径
+PORTS_FILE_PATH = "/usr/local/xos/static/conversion_ports.txt"
 test_result = {}
 # Configure logging
 logging.basicConfig(filename='/var/log/xos.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,14 +28,28 @@ def generate_random_string(length):
     return ''.join(random.choice(letters) for _ in range(length))
 
 
+# def generate_random_port():
+#     # 生成端口号并检查是否重复
+#     while True:
+#         random_port = random.randint(1024, 65534)
+#         if not is_local_port_in_use(random_port):
+#             break
+#     return random_port
 def generate_random_port():
-    # 生成端口号并检查是否重复
+    # 用于存储已经生成的端口号的集合
+    used_ports = set()
+    # 检查文件是否存在
+    if os.path.exists(PORTS_FILE_PATH):
+        with open(PORTS_FILE_PATH, "r") as file:
+            used_ports = set(int(port) for port in file.read().splitlines())
     while True:
         random_port = random.randint(1024, 65534)
-        if not is_local_port_in_use(random_port):
-            break
-    return random_port
-
+        if random_port not in used_ports and not is_local_port_in_use(random_port):
+            used_ports.add(random_port)
+            # 保存已使用的端口到文件
+            with open(PORTS_FILE_PATH, "w") as file:
+                file.write("\n".join(str(port) for port in used_ports))
+            return random_port
 
 def generate_random_id():
     """Generate a random UUID."""
