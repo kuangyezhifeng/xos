@@ -70,13 +70,17 @@ def update_handler():
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/hysteria2"])
         subprocess.run(["chmod", "+x", "/usr/local/xos/xray/xray"])
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
-        logging.info("xray hysteria2 程序权限修改完毕")
 
         # 创建一个at任务，延迟1分执行xos.sh脚本
-        command = 'echo "/usr/local/xos/static/xos.sh" | at now + 1 minutes'
-        subprocess.run(command, shell=True)
+        start_xos1 = 'echo "/usr/local/xos/static/xos.sh" | at now + 1 minutes'
+        start_xos2 = 'echo "/usr/local/xos/static/xos.sh" | at now + 2 minutes'
+        stop_xos1 = 'pkill -f app.py'
+        stop_xos2 = 'pkill -f app.py'
+        os.system(start_xos1)
+        os.system(start_xos2)
+        os.system(stop_xos1)
+        os.system(stop_xos2)
         logging.info("xos面板重启完成")
-        subprocess.run("pkill -f app.py", shell=True)
 
     except Exception as e:
         logging.error(f"更新 xos 项目失败：{e}")
