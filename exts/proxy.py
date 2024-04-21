@@ -86,6 +86,8 @@ def update_handler():
         # 标记更新操作已完成
         update_in_progress = False
 
+
+
 def create_chain_if_not_exists(table, chain):
     # 检查链是否存在
     check_exists_cmd = ['iptables', '-t', table, '-L', chain]
@@ -210,6 +212,38 @@ def reset_transparent_proxy_config():
 
     # 添加xray用户安装hysteria2程序
     xray_useradd()
+
+
+def restore_system_state():
+    socat_count = db.session.query(RelayConnection).filter_by(tag='1').count()
+    # 执行带有管道的命令
+    command = "ps -ef | grep socat | wc -l"
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    # 获取输出并转换为整数
+    output, error = process.communicate()
+    socat_running_count = int(output.decode().strip())
+    logging.info("socat 进程数量: %d", socat_count)
+
+    if socat_running_count < socat_count:
+        relay_connections = RelayConnection.query.all()
+        for relay_connection in relay_connections:
+            process_single_relay(relay_connection, "on")
+
+    create_fwmark_rule_and_local_route()
+    logging.info("XOS面板启动重置路由和标记规则")
+    # 执行命令获取输出
+    command = "iptables -vnL -t mangle | wc -l"
+    output = subprocess.check_output(command, shell=True)
+
+    # 获取输出并转换为整数
+    iptables_count = int(output.strip())
+    # 检查行数是否小于 64
+    if iptables_count < 64:
+        reset_transparent_proxy_config()
+        # 输出 iptables 行数
+        logging.info("XOS面板启动重置透明代理规则: %d", iptables_count)
+
 
 def xray_useradd():
     # 定义 xray 用户名
@@ -1326,16 +1360,19 @@ def node_domain_set(xray_config, decode_data):
     # 如果地址是域名，则解析域名并添加到文件中
     if access_ip and not is_ip_address(access_ip):
         hostname = access_ip
-        try:
-            ip_addresses = socket.gethostbyname_ex(hostname)[2]
-        except socket.gaierror as e:
-            logging.error(f"解析域名时发生错误: {e}")
-            return
+        # 执行 ping 命令获取域名对应的 IP 地址
+        output = subprocess.check_output(['ping', '-c', '1', hostname]).decode('utf-8')
+        # 使用正则表达式提取 IP 地址
+        ip_match = re.search(r'\(([0-9.]+)\)', output)
+        if ip_match:
+            ip_address = ip_match.group(1)
+            logging.info(f"成功将域名 {hostname} 解析为 IP 地址: {ip_address}")
+        else:
+            logging.error(f"无法从 ping 输出中提取 IP 地址: {output}")
 
         # 强制替换主机名对应的 IP 地址列表
-        xray_config['dns']['hosts'][hostname] = ip_addresses
-
-        logging.info(f"成功将 {hostname} IP 地址: {ip_addresses} 添加或更新到文件中")
+        xray_config['dns']['hosts'][hostname] = ip_address
+        logging.info(f"成功将 {hostname} IP 地址: {ip_address} 添加或更新到文件中")
 
 
 """
