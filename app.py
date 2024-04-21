@@ -104,8 +104,8 @@ def register():
             return render_template('error.html')
 
         new_user = User(username=username, email=email, password_hash=generate_password_hash(password))
-        # db.session.add(new_user)
-        # db.session.commit()
+        db.session.add(new_user)
+        db.session.commit()
 
         # 使用 login_user 将用户登录
         login_user(new_user)
