@@ -241,8 +241,8 @@ def restore_system_state():
 
     # 获取输出并转换为整数
     iptables_count = int(output.strip())
-    # 检查行数是否小于 64
-    if iptables_count < 64:
+    # 检查行数是否小于 58
+    if iptables_count < 58:
         reset_transparent_proxy_config()
         # 输出 iptables 行数
         logging.info("XOS面板启动重置透明代理规则: %d", iptables_count)
