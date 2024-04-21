@@ -1361,7 +1361,7 @@ def node_domain_set(xray_config, decode_data):
         logging.info('hysteria2域名解析跳过')
         return
     # 如果地址是域名，则解析域名并添加到文件中
-    if access_ip and not is_ip_address(access_ip):
+    if access_ip and not is_ip_address(access_ip) and ":" not in access_ip:
         hostname = access_ip
         # 执行 ping 命令获取域名对应的 IP 地址
         output = subprocess.check_output(['ping', '-c', '1', hostname]).decode('utf-8')
