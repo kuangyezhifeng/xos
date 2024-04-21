@@ -18,7 +18,6 @@ import socket
 
 # Configure logging
 logging.basicConfig(filename='/var/log/xos.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 # xray配置文件路径
 CONFIG_PATH = '/usr/local/xos/xray/config.json'
 CHECK_PATH = '/usr/local/xos/xray/xray-check.json'
