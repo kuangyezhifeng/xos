@@ -215,7 +215,7 @@ def reset_transparent_proxy_config():
 
 
 def restore_system_state():
-    socat_count = db.session.query(RelayConnection).filter_by(tag='1').count()
+    socat_count = db.session.query(RelayConnection).filter_by(status='1').count()
     # 执行带有管道的命令
     command = "ps -ef | grep socat | wc -l"
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -223,9 +223,8 @@ def restore_system_state():
     # 获取输出并转换为整数
     output, error = process.communicate()
     socat_running_count = int(output.decode().strip())
-    logging.info("socat 进程数量: %d", socat_count)
-
     if socat_running_count < socat_count:
+        logging.info("socat 进程数量,开始启动中转进程: %d", socat_count)
         relay_connections = RelayConnection.query.all()
         for relay_connection in relay_connections:
             process_single_relay(relay_connection, "on")
