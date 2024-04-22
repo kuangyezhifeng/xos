@@ -34,12 +34,12 @@
 
                     <td>{{ proxy.tag }}</td>
                     {% if proxy.gateway == 1 %}
-                    <td style="color: seagreen;">是</td>
+                    <td style="color: limegreen;">是</td>
                     {% else %}
                         <td>否</td>
                     {% endif %}
                     {% if proxy.status == "Active" %}
-                    <td style="color: seagreen;">{{ proxy.status }}</td>
+                    <td style="color: limegreen;">{{ proxy.status }}</td>
                      {% else %}
                         <td style="color: red ;">{{ proxy.status }}</td>
                     {% endif %}
