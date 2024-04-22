@@ -40,15 +40,15 @@
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('gateway_select') }}">设置网关</a>
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('system',exec_type='tproxy') }}">重置代理</a>
+                        <a class="dropdown-item" href="{{ url_for('xos_config') }}">参数设置</a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('update') }}">系统更新</a>
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('xos_config') }}">参数设置</a>
+                        <a class="dropdown-item" href="{{ url_for('system',exec_type='tproxy') }}">重置代理</a>
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('system',exec_type='xray') }}" style="color: red;"><b>清空配置</b></a>
+                        <a class="dropdown-item" href="{{ url_for('system',exec_type='xray') }}">重置配置</a>
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('system',exec_type='database') }}" style="color: red;"><b>清空数据</b></a>
+                        <a class="dropdown-item" href="{{ url_for('system',exec_type='database') }}"><b>清空数据</b></a>
                         <div class="dropdown-divider"></div>
                     </div>
                 </li>
