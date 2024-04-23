@@ -80,6 +80,10 @@
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('create_node', protocol='subscribe') }}">订阅添加</a>
                         <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='proxy_devices') }}">导出EXCEL</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='proxy_devices') }}">导入EXCEL</a>
+                        <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('database',type='proxy') }}">清空代理</a>
                         <div class="dropdown-divider"></div>
                     </div>
@@ -103,6 +107,10 @@
                         <a class="dropdown-item" href="{{ url_for('test_all_ports') }}">测试中转</a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('relay_on_off',type= 'off') }}">禁用中转</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='relay_connections') }}">导出EXCEL</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='relay_connections') }}">导入EXCEL</a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('database',type='forward') }}">清空中转</a>
                         <div class="dropdown-divider"></div>
@@ -130,6 +138,10 @@
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('conversion_disable') }}">禁用转换</a>
                         <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='conversion') }}">导出EXCEL</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='conversion') }}">导入EXCEL</a>
+                        <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('database',type='conversion') }}">清空转换</a>
                         <div class="dropdown-divider"></div>
                     </div>
@@ -152,6 +164,10 @@
                         <a class="dropdown-item" href="{{ url_for('batch_create_proxies') }}">主机搭建</a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('batch_get_proxies') }}">代理提取</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='host') }}">导出EXCEL</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='host') }}">导入EXCEL</a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('database',type='host') }}">清空主机</a>
                         <div class="dropdown-divider"></div>

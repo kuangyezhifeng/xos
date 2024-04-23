@@ -1,12 +1,14 @@
 # coding=utf-8
 # 依赖程序sshpass socat  ssh-keygen -t rsa -b 2048
-from flask import render_template
+from flask import render_template,send_file,request
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from flask_migrate import Migrate
 from exts.host import *
 from exts.hysteria2 import *
 from exts.log_handler import *
 from exts.conversion import *
+from exts.excel import *
+import pandas as pd
 from sqlalchemy import desc
 from app import create_app
 import psutil
@@ -1021,7 +1023,6 @@ def host_update():
 
             # 将字符串日期转换为日期对象
             update_data['day'] = datetime.strptime(update_data['day'], '%Y-%m-%d').date()
-
             # 手动更新属性
             for key, value in update_data.items():
                 setattr(host, key, value)
@@ -1357,6 +1358,35 @@ def copy_record(id):
 
     return redirect(url_for('host_view', id=host_id, user=current_user))
 
+
+@app.route('/export_excel_route/<table_name>')
+@login_required
+def export_excel_route(table_name):
+    # 返回 Excel 文件
+    return export_excel(table_name)
+
+@app.route('/import_excel_route/<table_name>', methods=['GET', 'POST'])
+@login_required
+def import_excel_route(table_name):
+    if request.method == 'GET':
+        # 处理 GET 请求的逻辑
+        return render_template('upload.html', table_name=table_name)
+
+    elif request.method == 'POST':
+        # 处理 POST 请求的逻辑
+        uploaded_file = request.files['file']
+        table_name = request.form.get('table_name')
+        # 调用处理文件上传的函数
+        import_excel(uploaded_file, table_name)
+
+        if table_name == 'proxy_devices':
+            return redirect(url_for('dashboard', user=current_user))
+        elif table_name == 'relay_connections':
+            return redirect(url_for('relay_connections', user=current_user))
+        elif table_name == 'host':
+            return redirect(url_for('host', user=current_user))
+        elif table_name == 'conversion':
+            return redirect(url_for('conversion', user=current_user))
 
 if __name__ == '__main__':
     # app.run(port=80, host="0.0.0.0")

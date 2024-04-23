@@ -65,9 +65,9 @@ class Host(db.Model):
     country = db.Column(db.String(length=255))
     day = db.Column(db.Date, default=datetime.now)
     ip = db.Column(db.String(15), unique=True, nullable=False)
-    account = db.Column(db.String(256), nullable=False)
-    password = db.Column(db.String(256), nullable=False)  # 明文存储密码
-    port = db.Column(db.Integer, nullable=False)
+    account = db.Column(db.String(256))
+    password = db.Column(db.String(256))  # 明文存储密码
+    port = db.Column(db.Integer)
     website = db.Column(db.String(256))
     remark = db.Column(db.String(256))
     active = db.Column(db.String(15))
@@ -89,7 +89,7 @@ class Host_Config(db.Model):
 
 
 class Conver(db.Model):
-    __tablename__ = 'conver'
+    __tablename__ = 'conversion'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     proxy_ip = db.Column(db.String(255))
     real_ip = db.Column(db.String(255))
