@@ -102,7 +102,7 @@ def generate_vless_link(protocol, ip, port):
         "encryption": "none",
         "flow": "xtls-rprx-vision",
         "security": "reality",
-        "sni": "www.savoirsuisse.org",
+        "sni": "www.cloudflare.com",
         "fp": "chrome",
         "pbk": "S-g0oP36DShii1uPOnZDSEhp_wQghX6h68PgMivOmD4",
         "type": "tcp",
@@ -574,11 +574,11 @@ def generate_vless_json(data):
                 "realitySettings":
                     {
                         "show": False,
-                        "dest": "www.savoirsuisse.org:443",
+                        "dest": "www.cloudflare.com:443",
                         "xver": 0,
                         "serverNames":
                             [
-                                "www.savoirsuisse.org"
+                                "www.cloudflare.com"
                             ],
                         "privateKey": "MGpadXgOh0X_ylHa8y4OO_0QdRIVEXgwCdeJ3wkFUEo",
                         "publicKey": "S-g0oP36DShii1uPOnZDSEhp_wQghX6h68PgMivOmD4",
