@@ -223,6 +223,8 @@ def escape_password(password):
             v += '\<'
         elif i == '>':
             v += '\>'
+        elif i == '`':
+            v += '\`'
         else:
             v += i
     return v
