@@ -1361,27 +1361,26 @@ def node_domain_set(xray_config, decode_data):
         logging.info('hysteria2域名解析跳过')
         return
     # 如果地址是域名，则解析域名并添加到文件中
+
     if access_ip and not is_ip_address(access_ip) and ":" not in access_ip:
         hostname = access_ip
-        try:
-            # 执行命令
-            output = subprocess.check_output(['runuser', '-l', 'xray', '-c', f'ping {hostname}']).decode('utf-8')
-            # 使用正则表达式提取 IP 地址
-            ip_match = re.search(r'\(([0-9.]+)\)', output)
-            if ip_match:
-                ip_address = ip_match.group(1)
-                logging.info(f"成功将域名 {hostname} 解析为 IP 地址: {ip_address}")
-            else:
-                logging.error(f"无法从 ping 输出中提取 IP 地址: {output}")
-
+        #写入 DNS 配置文件
+        subprocess.run(['echo', '-e', '"nameserver 8.8.8.8\nnameserver 1.1.1.1"', '>', '/etc/resolv.conf'],shell=True)
+        # 执行命令PING解析域名并获取到IP地址
+        command = ['sudo', '-u', 'xray', 'ping', '-c', '1', hostname]
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, _ = process.communicate()
+        # 解码输出
+        output = output.decode('utf-8')
+        # 使用正则表达式提取 IP 地址
+        ip_match = re.search(r'\(([0-9.]+)\)', output)
+        if ip_match:
+            ip_address = ip_match.group(1)
             # 强制替换主机名对应的 IP 地址列表
             xray_config['dns']['hosts'][hostname] = ip_address
-            logging.info(f"成功将 {hostname} IP 地址: {ip_address} 添加或更新到文件中")
-
-        except subprocess.CalledProcessError as e:
-            # 使用 echo 命令写入 DNS 配置文件
-            subprocess.run(['echo', '-e', '"nameserver 8.8.8.8\nnameserver 1.1.1.1"', '>', '/etc/resolv.conf'],shell=True)
-            logging.error(f"ping命令解析域名异常,请检查系统DNS配置: {e}")
+            logging.info(f"成功将域名 {hostname} 解析为 IP 地址: {ip_address}")
+        else:
+            logging.error(f"无法从 ping 输出中提取 IP 地址: {output}")
 
 """
 node_domain_unset 函数
