@@ -1363,20 +1363,25 @@ def node_domain_set(xray_config, decode_data):
     # 如果地址是域名，则解析域名并添加到文件中
     if access_ip and not is_ip_address(access_ip) and ":" not in access_ip:
         hostname = access_ip
-        # 执行 ping 命令获取域名对应的 IP 地址
-        output = subprocess.check_output(['ping', '-c', '1', hostname]).decode('utf-8')
-        # 使用正则表达式提取 IP 地址
-        ip_match = re.search(r'\(([0-9.]+)\)', output)
-        if ip_match:
-            ip_address = ip_match.group(1)
-            logging.info(f"成功将域名 {hostname} 解析为 IP 地址: {ip_address}")
-        else:
-            logging.error(f"无法从 ping 输出中提取 IP 地址: {output}")
+        try:
+            # 执行命令
+            output = subprocess.check_output(['runuser', '-l', 'xray', '-c', f'ping {hostname}']).decode('utf-8')
+            # 使用正则表达式提取 IP 地址
+            ip_match = re.search(r'\(([0-9.]+)\)', output)
+            if ip_match:
+                ip_address = ip_match.group(1)
+                logging.info(f"成功将域名 {hostname} 解析为 IP 地址: {ip_address}")
+            else:
+                logging.error(f"无法从 ping 输出中提取 IP 地址: {output}")
 
-        # 强制替换主机名对应的 IP 地址列表
-        xray_config['dns']['hosts'][hostname] = ip_address
-        logging.info(f"成功将 {hostname} IP 地址: {ip_address} 添加或更新到文件中")
+            # 强制替换主机名对应的 IP 地址列表
+            xray_config['dns']['hosts'][hostname] = ip_address
+            logging.info(f"成功将 {hostname} IP 地址: {ip_address} 添加或更新到文件中")
 
+        except subprocess.CalledProcessError as e:
+            # 使用 echo 命令写入 DNS 配置文件
+            subprocess.run(['echo', '-e', '"nameserver 8.8.8.8\nnameserver 1.1.1.1"', '>', '/etc/resolv.conf'],shell=True)
+            logging.error(f"ping命令解析域名异常,请检查系统DNS配置: {e}")
 
 """
 node_domain_unset 函数
@@ -2602,6 +2607,33 @@ def xray_device_route_handler(proxys, raw_text):
         logging.error(f"添加设备路由规则失败：{device_ip}-出站路由：{tag}")
 
     return {'success': True, 'message': 'IP地址更新成功'}
+
+def excel_import_device_route_handler():
+    # 打开 JSON 文件并加载数据
+    xray_config = load_xray_config(CONFIG_PATH)
+    rules = xray_config.get('routing', {}).get('rules', [])
+
+    # 过滤出同时满足条件的规则并移除
+    filtered_rules = [rule for rule in rules if rule.get('type') == 'field' and 'source' in rule]
+    for rule in filtered_rules:
+        rules.remove(rule)
+
+    # 更新出站绑定设备IP规则
+    xray_config['routing']['rules'] = rules
+    save_xray_config(xray_config,CONFIG_PATH)
+
+    # 查询条件：device_ip 不为空的记录
+    proxies_with_ip = ProxyDevice.query.filter(ProxyDevice.device_ip != None).all()
+    # 循环执行函数
+    for proxy in proxies_with_ip:
+        device_ip = proxy.device_ip
+        tag = proxy.tag
+        route_dict = generate_device_route(device_ip, tag)
+        if route_dict:
+            xray_route_rule(route_dict, "source")
+            logging.info(f"EXCEL导入设备关联代理成功：{device_ip}-出站路由：{tag}")
+        else:
+            logging.error(f"EXCEL导入设备关联代理失败：{device_ip}-出站路由：{tag}")
 
 
 """

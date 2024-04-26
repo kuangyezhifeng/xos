@@ -3,6 +3,7 @@ from io import BytesIO
 import pandas as pd
 from flask import send_file
 from app.models import *
+from exts.proxy import excel_import_device_route_handler
 def export_excel(table_name):
     # 根据传入的表名获取数据，这里假设根据不同的表名获取不同的数据
     if table_name == 'proxy_devices':
@@ -176,6 +177,8 @@ def import_excel(uploaded_file, table_name):
     try:
         db.session.bulk_save_objects(records)
         db.session.commit()
+        if table_name == 'proxy_devices':
+            excel_import_device_route_handler()
         logging.info(f"导入{table_name}数据表成功")
     except Exception as e:
         db.session.rollback()
