@@ -182,4 +182,4 @@ def import_excel(uploaded_file, table_name):
         logging.info(f"导入{table_name}数据表成功")
     except Exception as e:
         db.session.rollback()
-        logging.info(f"导入{table_name}数据表失败")
+        logging.info(f"导入{table_name}数据表失败:{e}")

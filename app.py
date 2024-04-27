@@ -1088,17 +1088,23 @@ def host_view():
 @login_required
 def host_ips():
     if request.method == 'GET':
-        host_record = Host.query.get(request.args.get('id'))
+        host_info = Host.query.get(request.args.get('id'))
         # 调用 get_remote_ip_addresses 函数
-        get_remote_ip_addresses(host_record.ip, host_record.account)
+        ip = host_info.ip
+        username = host_info.account
+        passwd = host_info.password
+        port = host_info.port
+        get_remote_ip_addresses(ip, username, passwd, port)
 
     elif request.method == 'POST':
         selected_items = request.form.getlist('selected_items[]')
         for host_id in selected_items:
-            host_record = Host.query.get(host_id)
-            # 调用 get_remote_ip_addresses 函数
-            get_remote_ip_addresses(host_record.ip, host_record.account)
-
+            host_info = Host.query.get(host_id)
+            ip = host_info.ip
+            username = host_info.account
+            passwd = host_info.password
+            port = host_info.port
+            get_remote_ip_addresses(ip, username, passwd, port)
     return redirect(url_for('host', user=current_user))
 
 

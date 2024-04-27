@@ -230,45 +230,36 @@ def escape_password(password):
     return v
 
 
-def get_remote_ip_addresses(host, username, private_key_path=None, timeout=5):
+def get_remote_ip_addresses(host, username, password, port):
     try:
-        # 构建远程命令
-        command = f"ssh {username}@{host} hostname -I"
-        if private_key_path:
-            command += f" -i {private_key_path}"
+        # 创建 SSH 客户端
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # 连接到远程服务器
+        ssh_client.connect(hostname=host, port=port, username=username, password=password)
+        # 执行命令以获取 IP 地址
+        stdin, stdout, stderr = ssh_client.exec_command('hostname -I')
+        # 读取输出
+        output = stdout.read().decode().strip()
+        # 关闭 SSH 连接
+        ssh_client.close()
+        # 将输出的 IP 地址拆分
+        remote_ips = output.split()
 
-        # 执行远程命令
-        with subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True) as process:
-            stdout, stderr = process.communicate(timeout=timeout)
+        # 将 IP 地址添加到数据库
+        existing_ips = set()
+        for ip in remote_ips:
+            existing_record = Host_Config.query.filter_by(main_ip=host, auxiliary_ip=ip).first()
+            if existing_record:
+                existing_ips.add(ip)
 
-        if process.returncode == 0:
-            # 获取远程服务器的所有IP地址
-            remote_ips = stdout.strip().split()
+        new_host_configs = [Host_Config(main_ip=host, auxiliary_ip=ip) for ip in remote_ips if ip not in existing_ips]
+        db.session.add_all(new_host_configs)
+        db.session.commit()
 
-            # 检查数据库中已存在的IP地址
-            existing_ips = set()
-            for ip in remote_ips:
-                existing_record = Host_Config.query.filter_by(main_ip=host, auxiliary_ip=ip).first()
-                if existing_record:
-                    existing_ips.add(ip)
-
-            # 将数据库中不存在的IP地址创建为Host_Config对象并添加到数据库中
-            new_host_configs = [Host_Config(main_ip=host, auxiliary_ip=ip) for ip in remote_ips if ip not in existing_ips]
-
-            # 添加到数据库并提交更改
-            db.session.add_all(new_host_configs)
-            db.session.commit()
-
-            logging.info(f"获取远程服务器 {host} 地址成功 ")
-        else:
-            logging.error(f"获取远程服务器 {host} IP 地址失败: {stderr}")
-
-    except subprocess.TimeoutExpired:
-        logging.error(f"获取远程服务器 {host} IP 地址超时")
-    except subprocess.CalledProcessError as e:
-        logging.error(f"获取远程服务器 {host} IP 地址失败: {e}")
+        logging.info(f"成功从远程服务器 {host} 中检索到 IP 地址")
     except Exception as e:
-        logging.error(f"获取远程服务器 {host} IP 地址失败: {e}")
+        logging.error(f"无法从远程服务器 {host} 中检索 IP 地址: {e}")
 
 
 def remote_install_unzip(ssh_client):
