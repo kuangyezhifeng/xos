@@ -94,7 +94,7 @@ def export_excel(table_name):
 
 def import_excel(uploaded_file, table_name):
     try:
-        df = pd.read_excel(uploaded_file, engine='openpyxl')
+        df = pd.read_excel(uploaded_file, engine='openpyxl',dtype=str)
         # 删除空行
         df = df.dropna(how='all')  # 只删除所有列都为 NaN 的行
     except Exception as e:
