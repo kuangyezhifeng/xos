@@ -285,17 +285,9 @@ def set_tag(proxies):
         proxies.flag = 1
         db.session.commit()
 
+
+
 def set_config(proxies):
-    # 拦截socks协议,使用特殊独立运行进程处理
-    # if proxies.protocol == 'socks':
-    #     if proxies.device_ip:
-    #         if proxies.flag == 1:
-    #             uninstall_socks_service(proxies.tag, proxies.device_ip)
-    #         else:
-    #             socks_service_config(proxies.tag, proxies.proxy_url, proxies.device_ip)
-    #         set_tag(proxies)
-    #     else:
-    #         logging.info("socks独立运行,必须绑定设备ip地址!")
     if proxies.protocol == 'hysteria2':
         if proxies.flag == 1:
             xray_node_outbound_remove(proxies.tag)
@@ -2591,11 +2583,6 @@ def xray_device_route_handler(proxys, raw_text):
     device_ip = proxys.device_ip
     tag = proxys.tag
     protocol = proxys.protocol
-
-    # # 生成和更新路由配置,socks在独立运行模式下使用
-    # if protocol == 'socks':
-    #     logging.info("socks代理无需在主配置中生成设备路由条目")
-
     route_dict = generate_device_route(device_ip, tag)
 
     if route_dict:
@@ -2856,10 +2843,6 @@ def xray_node_delete_handler(proxy_device):
         access_ip = proxy_device.access_ip
         protocol = proxy_device.protocol
         device_ip = proxy_device.device_ip
-
-        # 独立模式运行的SOCKS
-        # if protocol == 'socks':
-        #     uninstall_socks_service(tag, device_ip)
 
         # 删除对应的 Xray 出站配置和路由规则
         if is_ip_address(access_ip):

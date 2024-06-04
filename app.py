@@ -1,6 +1,6 @@
 # coding=utf-8
 # 依赖程序sshpass socat  ssh-keygen -t rsa -b 2048
-from flask import render_template,send_file,request
+from flask import render_template, send_file, request, jsonify
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from flask_migrate import Migrate
 from exts.host import *
@@ -8,6 +8,7 @@ from exts.hysteria2 import *
 from exts.log_handler import *
 from exts.conversion import *
 from exts.excel import *
+from exts.socks import alone_socks_config,alone_proxy_url
 import pandas as pd
 from sqlalchemy import desc
 from app import create_app
@@ -19,6 +20,9 @@ Migrate(app=app, db=db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 PER_PAGE = 50
+
+CONFIG_DIR = "/usr/local/xos/xray"
+XRAY_EXEC = "/usr/local/xos/xray/xray"
 
 realtime_data = {
     'cpu': 0,
@@ -1393,6 +1397,36 @@ def import_excel_route(table_name):
             return redirect(url_for('host', user=current_user))
         elif table_name == 'conversion':
             return redirect(url_for('conversion', user=current_user))
+
+
+@app.route('/configure', methods=['GET'])
+def configure():
+    socks_ip = request.args.get('ip')
+    socks_port = request.args.get('port')
+    socks_user = request.args.get('user')
+    socks_pass = request.args.get('pass')
+
+    if not (socks_ip and socks_port and socks_user and socks_pass):
+        return jsonify({"error": "Missing required parameters"}), 400
+    # 获取请求接口的IP地址
+    proxy_ip = request.remote_addr
+    # 根据请求接口的IP地址获取代理信息
+    proxy_url = alone_proxy_url(proxy_ip)
+
+    if not proxy_url:
+        return jsonify({"error": "Proxy not bind lan ip address"}), 404
+
+    # 生成以端口号命令的配置文件
+    proxy_port = int(proxy_url.split(':')[-1])
+    config = alone_socks_config(proxy_port, socks_ip, socks_port, socks_user, socks_pass)
+    config_path = os.path.join(CONFIG_DIR, f"{proxy_port}.json")
+
+    save_xray_config(config, config_path)
+    subprocess.Popen(["pkill", "-f", str(proxy_port)+".json"])
+    subprocess.Popen(["pkill", "-f", str(proxy_port)+".json"])
+    subprocess.Popen(["nohup", XRAY_EXEC, "-c", config_path, "&"])
+
+    return jsonify({"message": f"{proxy_ip} proxy  and process started for port {proxy_port}"}), 200
 
 if __name__ == '__main__':
     # app.run(port=80, host="0.0.0.0")
