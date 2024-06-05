@@ -8,7 +8,7 @@ from exts.hysteria2 import *
 from exts.log_handler import *
 from exts.conversion import *
 from exts.excel import *
-from exts.socks import alone_socks_config,alone_proxy_url
+from exts.socks import alone_socks_config, alone_proxy_url, alone_running_socks, alone_noauth_socks_config
 import pandas as pd
 from sqlalchemy import desc
 from app import create_app
@@ -20,9 +20,6 @@ Migrate(app=app, db=db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 PER_PAGE = 50
-
-CONFIG_DIR = "/usr/local/xos/xray"
-XRAY_EXEC = "/usr/local/xos/xray/xray"
 
 realtime_data = {
     'cpu': 0,
@@ -1399,6 +1396,37 @@ def import_excel_route(table_name):
             return redirect(url_for('conversion', user=current_user))
 
 
+# @app.route('/configure', methods=['GET'])
+# def configure():
+#     socks_ip = request.args.get('ip')
+#     socks_port = request.args.get('port')
+#     socks_user = request.args.get('user')
+#     socks_pass = request.args.get('pass')
+#
+#     if not (socks_ip and socks_port and socks_user and socks_pass):
+#         return jsonify({"error": "Missing required parameters"}), 400
+#     # 获取请求接口的IP地址
+#     proxy_ip = request.remote_addr
+#     # 根据请求接口的IP地址获取代理信息
+#     proxy_url = alone_proxy_url(proxy_ip)
+#
+#     if not proxy_url:
+#         return jsonify({"error": "Proxy not bind lan ip address"}), 404
+#
+#     # 生成以端口号命令的配置文件
+#     proxy_port = int(proxy_url.split(':')[-1])
+#     config = alone_socks_config(proxy_port, socks_ip, socks_port, socks_user, socks_pass)
+#     config_path = os.path.join(CONFIG_DIR, f"{proxy_port}.json")
+#
+#     save_xray_config(config, config_path)
+#     subprocess.Popen(["pkill", "-f", str(proxy_port)+".json"])
+#     subprocess.Popen(["pkill", "-f", str(proxy_port)+".json"])
+#     subprocess.Popen(["nohup", XRAY_EXEC, "-c", config_path, "&"])
+#
+#     return jsonify({"message": f"{proxy_ip} proxy  and process started for port {proxy_port}"}), 200
+
+
+
 @app.route('/configure', methods=['GET'])
 def configure():
     socks_ip = request.args.get('ip')
@@ -1406,27 +1434,34 @@ def configure():
     socks_user = request.args.get('user')
     socks_pass = request.args.get('pass')
 
-    if not (socks_ip and socks_port and socks_user and socks_pass):
+    # Check for required parameters
+    if not (socks_ip and socks_port):
         return jsonify({"error": "Missing required parameters"}), 400
-    # 获取请求接口的IP地址
+
+    # Get the IP address of the requested interface
     proxy_ip = request.remote_addr
-    # 根据请求接口的IP地址获取代理信息
+    # Obtain proxy information based on the IP address of the requested interface
     proxy_url = alone_proxy_url(proxy_ip)
 
     if not proxy_url:
         return jsonify({"error": "Proxy not bind lan ip address"}), 404
 
-    # 生成以端口号命令的配置文件
+    # Generate a configuration file with port number commands
     proxy_port = int(proxy_url.split(':')[-1])
-    config = alone_socks_config(proxy_port, socks_ip, socks_port, socks_user, socks_pass)
-    config_path = os.path.join(CONFIG_DIR, f"{proxy_port}.json")
 
-    save_xray_config(config, config_path)
-    subprocess.Popen(["pkill", "-f", str(proxy_port)+".json"])
-    subprocess.Popen(["pkill", "-f", str(proxy_port)+".json"])
-    subprocess.Popen(["nohup", XRAY_EXEC, "-c", config_path, "&"])
+    # Create the configuration based on the presence of user and pass
+    if socks_user and socks_pass:
+        config = alone_socks_config(proxy_port, socks_ip, socks_port, socks_user, socks_pass)
+    else:
+        config = alone_noauth_socks_config(proxy_port, socks_ip, socks_port)
 
-    return jsonify({"message": f"{proxy_ip} proxy  and process started for port {proxy_port}"}), 200
+    result = alone_running_socks(proxy_port, config)
+
+    if result:
+        return jsonify({"message": f"{proxy_ip} proxy and process started for port {proxy_port}"}), 200
+    else:
+        return jsonify({"message": f"{proxy_ip} proxy and process started for port {proxy_port} error"}), 200
+
 
 if __name__ == '__main__':
     # app.run(port=80, host="0.0.0.0")
