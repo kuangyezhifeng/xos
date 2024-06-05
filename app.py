@@ -1458,9 +1458,9 @@ def configure():
     result = alone_running_socks(proxy_port, config)
 
     if result:
-        return jsonify({"message": f"{proxy_ip} proxy and process started for port {proxy_port}"}), 200
+        return jsonify({"success": f"{proxy_ip} proxy and process started for port {proxy_port}"}), 200
     else:
-        return jsonify({"message": f"{proxy_ip} proxy and process started for port {proxy_port} error"}), 200
+        return jsonify({"failure": f"{proxy_ip} proxy and process started for port {proxy_port} error"}), 200
 
 
 if __name__ == '__main__':
