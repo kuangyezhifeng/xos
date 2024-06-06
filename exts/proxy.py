@@ -1357,7 +1357,7 @@ def node_domain_set(xray_config, decode_data):
     if access_ip and not is_ip_address(access_ip) and ":" not in access_ip:
         hostname = access_ip
         #写入 DNS 配置文件
-        subprocess.run(['echo', '-e', '"nameserver 8.8.8.8\nnameserver 1.1.1.1"', '>', '/etc/resolv.conf'],shell=True)
+        subprocess.run(['echo', '-e', '"nameserver 8.8.8.8\nnameserver 1.1.1.1"', '>', '/etc/resolv.conf'], shell=True)
         # 执行命令PING解析域名并获取到IP地址
         command = ['sudo', '-u', 'xray', 'ping', '-c', '1', hostname]
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -2201,10 +2201,13 @@ def xray_node_route_add(xray_config, decode_data, protocol):
                           (access_ip in rule.get("ip", []) and int(port) == int(rule.get("port", 0)))), None)
 
     if not existing_rule:
-        # 如果不存在规则，创建一个新规则并插入到列表的位置 0
-        new_rule = {"type": "field", "outboundTag": "direct", "domain": [access_ip], "port": port}
-        xray_config["routing"].setdefault("rules", []).insert(0, new_rule)
+        # 判断 access_ip 是域名还是IP地址
+        if is_ip_address(access_ip):
+            new_rule = {"type": "field", "outboundTag": "direct", "ip": [access_ip], "port": port}
+        else:
+            new_rule = {"type": "field", "outboundTag": "direct", "domain": [access_ip], "port": port}
 
+        xray_config["routing"].setdefault("rules", []).insert(0, new_rule)
     else:
         logging.warning(f"当前节点路由规则已经存在:{access_ip}:{port}")
 

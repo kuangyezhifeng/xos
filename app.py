@@ -1396,37 +1396,6 @@ def import_excel_route(table_name):
             return redirect(url_for('conversion', user=current_user))
 
 
-# @app.route('/configure', methods=['GET'])
-# def configure():
-#     socks_ip = request.args.get('ip')
-#     socks_port = request.args.get('port')
-#     socks_user = request.args.get('user')
-#     socks_pass = request.args.get('pass')
-#
-#     if not (socks_ip and socks_port and socks_user and socks_pass):
-#         return jsonify({"error": "Missing required parameters"}), 400
-#     # 获取请求接口的IP地址
-#     proxy_ip = request.remote_addr
-#     # 根据请求接口的IP地址获取代理信息
-#     proxy_url = alone_proxy_url(proxy_ip)
-#
-#     if not proxy_url:
-#         return jsonify({"error": "Proxy not bind lan ip address"}), 404
-#
-#     # 生成以端口号命令的配置文件
-#     proxy_port = int(proxy_url.split(':')[-1])
-#     config = alone_socks_config(proxy_port, socks_ip, socks_port, socks_user, socks_pass)
-#     config_path = os.path.join(CONFIG_DIR, f"{proxy_port}.json")
-#
-#     save_xray_config(config, config_path)
-#     subprocess.Popen(["pkill", "-f", str(proxy_port)+".json"])
-#     subprocess.Popen(["pkill", "-f", str(proxy_port)+".json"])
-#     subprocess.Popen(["nohup", XRAY_EXEC, "-c", config_path, "&"])
-#
-#     return jsonify({"message": f"{proxy_ip} proxy  and process started for port {proxy_port}"}), 200
-
-
-
 @app.route('/configure', methods=['GET'])
 def configure():
     socks_ip = request.args.get('ip')
