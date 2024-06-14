@@ -47,11 +47,6 @@ def alone_socks_config(proxy_port, socks_ip, socks_port, socks_user, socks_pass)
                 "protocol": "freedom",
                 "settings": {
                     "domainStrategy": "AsIs"
-                },
-                "streamSettings": {
-                    "sockopt": {
-                        "mark": 128
-                    }
                 }
             },
             {
@@ -59,14 +54,6 @@ def alone_socks_config(proxy_port, socks_ip, socks_port, socks_user, socks_pass)
                 "protocol": "dns",
                 "settings": {
                     "address": "8.8.8.8"
-                },
-                "proxySettings": {
-                    "tag": "proxy"
-                },
-                "streamSettings": {
-                    "sockopt": {
-                        "mark": 128
-                    }
                 }
             },
             {
@@ -152,11 +139,6 @@ def alone_noauth_socks_config(proxy_port, socks_ip, socks_port):
                 "protocol": "freedom",
                 "settings": {
                     "domainStrategy": "AsIs"
-                },
-                "streamSettings": {
-                    "sockopt": {
-                        "mark": 128
-                    }
                 }
             },
             {
@@ -164,14 +146,6 @@ def alone_noauth_socks_config(proxy_port, socks_ip, socks_port):
                 "protocol": "dns",
                 "settings": {
                     "address": "8.8.8.8"
-                },
-                "proxySettings": {
-                    "tag": "proxy"
-                },
-                "streamSettings": {
-                    "sockopt": {
-                        "mark": 128
-                    }
                 }
             },
             {
