@@ -741,11 +741,6 @@ def reset_xray_config():
                 },
                 {
                     "type": "field",
-                    "domain": ["geosite:category-ads-all"],
-                    "outboundTag": "block"
-                },
-                {
-                    "type": "field",
                     "ip": [
                         "127.0.0.1/8",
                         "192.168.0.0/16",
@@ -753,7 +748,6 @@ def reset_xray_config():
                         "10.0.0.0/8",
                         "114.114.114.114",
                         "223.5.5.5",
-                        "geoip:cn",
                         "geoip:private"
                     ],
                     "outboundTag": "direct"
