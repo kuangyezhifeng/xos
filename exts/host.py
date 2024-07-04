@@ -438,7 +438,7 @@ ExecStart={XRAY_EXEC_FILE} -config {XRAY_CONFIG_PATH}
 Restart=on-failure
 User=nobody
 RestartSec=3
-LimitNOFILE=4096
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
