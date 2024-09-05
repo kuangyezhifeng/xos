@@ -306,12 +306,12 @@ def set_config(proxies):
 
 def switch_proxy_mode(mode):
     if mode == "local":
-        sed_command = ['sed', '-i', 's/^#*net\.ipv4\.ip_forward.*/net.ipv4.ip_forward = 1/', '/etc/sysctl.conf']
+        sed_command = ['sed', '-i', 's/^#*net\\.ipv4\\.ip_forward.*/net.ipv4.ip_forward = 1/', '/etc/sysctl.conf']
         sed_process = subprocess.run(sed_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         subprocess.run(['iptables', '-F', '-t', 'mangle'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         Xos_config.query.update({"proxy_mode": False})
     else:
-        sed_command = ['sed', '-i', 's/^#*net\.ipv4\.ip_forward.*/net.ipv4.ip_forward = 0/', '/etc/sysctl.conf']
+        sed_command = ['sed', '-i', 's/^#*net\\.ipv4\\.ip_forward.*/net.ipv4.ip_forward = 0/', '/etc/sysctl.conf']
         sed_process = subprocess.run(sed_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         create_fwmark_rule_and_local_route()
         reset_transparent_proxy_config()
@@ -1271,15 +1271,18 @@ def decode_socks_link(socks_link):
         if socks_link.startswith('socks://'):
             socks_link = socks_link[len('socks://'):]
 
-        # 按':'拆分连接字符串
-        parts = socks_link.split(':')
+        # 格式: target_ip:port:username:password
+        parts = socks_link.split(':', 2)  # 只拆分前两个冒号，剩下的留给用户名和密码
 
         # 提取协议、目标 IP 和目标端口
         protocol = 'socks'
         target_ip = parts[0]
         target_port = int(parts[1])
-        username = parts[2] if len(parts) > 2 else None
-        password = parts[3] if len(parts) > 3 else None
+
+        # 提取用户名和密码
+        remaining = parts[2].split(':', 1)  # 剩余部分再次以冒号拆分
+        username = remaining[0]
+        password = remaining[1] if len(remaining) > 1 else None
 
         # 验证协议
         if protocol.lower() != 'socks':
@@ -1290,8 +1293,8 @@ def decode_socks_link(socks_link):
             raise ValueError("端口范围不正确")
 
         # 验证IP地址
-        if not is_ip_address(target_ip):
-            raise ValueError("无效的IP地址")
+        if not is_ip_or_domain(target_ip):
+            raise ValueError("错误的域名或IP地址")
 
         decoded_data = {
             "protocol": protocol,
@@ -1300,13 +1303,11 @@ def decode_socks_link(socks_link):
             "username": username,
             "password": password
         }
-
         return decoded_data
 
     except Exception as e:
         logging.error(f"解码 SOCKS 连接时出错: {str(e)}")
         return None
-
 
 def get_all_access_ips():
     try:
@@ -1417,6 +1418,21 @@ def is_ip_address(access_ip):
         return False
 
 
+# 验证 IP 或域名
+def is_ip_or_domain(target_ip):
+    # 首先检查是否是有效的 IP 地址
+    if is_ip_address(target_ip):
+        return True
+
+    # 使用正则表达式检查是否是有效的域名
+    domain_pattern = re.compile(r'^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$')
+    if domain_pattern.match(target_ip):
+        return True
+
+    # 如果都不是，则返回 False
+    return False
+
+
 """
 
 load_xray_config 函数
@@ -1511,6 +1527,7 @@ outbound_tag: 待检查的出站标签。
 
 def is_outbound_tag_exist(xray_config, outbound_tag):
     return any(outbound.get("tag") == outbound_tag for outbound in xray_config.get('outbounds', []))
+
 
 
 """

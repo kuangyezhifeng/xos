@@ -186,48 +186,49 @@ def escape_password(password):
         if i == '\\':
             v += '\\\\'
         elif i == '*':
-            v += '\*'
+            v += r'\*'
         elif i == '&':
-            v += '\&'
+            v += r'\&'
         elif i == ']':
-            v += '\]'
+            v += r'\]'
         elif i == '[':
-            v += '\['
+            v += r'\['
         elif i == '+':
-            v += '\+'
+            v += r'\+'
         elif i == '-':
-            v += '\-'
+            v += r'\-'
         elif i == '@':
-            v += '\@'
+            v += r'\@'
         elif i == '#':
-            v += '\#'
+            v += r'\#'
         elif i == '$':
-            v += '\$'
+            v += r'\$'
         elif i == "'":
-            v += "\\'"
+            v += r"\'"
         elif i == '?':
-            v += '\?'
+            v += r'\?'
         elif i == '^':
-            v += '\^'
+            v += r'\^'
         elif i == '.':
-            v += '\.'
+            v += r'\.'
         elif i == '!':
-            v += '\!'
+            v += r'\!'
         elif i == '(':
-            v += '\('
+            v += r'\('
         elif i == ')':
-            v += '\)'
+            v += r'\)'
         elif i == ';':
-            v += '\;'
+            v += r'\;'
         elif i == '<':
-            v += '\<'
+            v += r'\<'
         elif i == '>':
-            v += '\>'
+            v += r'\>'
         elif i == '`':
-            v += '\`'
+            v += r'\`'
         else:
             v += i
     return v
+
 
 
 def get_remote_ip_addresses(host, username, password, port):
