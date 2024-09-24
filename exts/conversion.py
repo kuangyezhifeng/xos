@@ -63,10 +63,21 @@ def get_public_ip():
         if response.status_code == 200:
             return response.text
         else:
-            logging.info("获取公网地址:", response.status_code)
+            logging.error("获取公网地址失败，状态码: %s", response.status_code)
     except Exception as e:
-       pass
-    return None
+        logging.error("发生异常: %s", e)
+
+    # 备用方法
+    try:
+        result = subprocess.run(['curl', '-s', 'ip.sb'], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+        else:
+            logging.error("备用方法获取公网地址失败，状态码: %s", result.returncode)
+    except Exception as e:
+        logging.error("备用方法发生异常: %s", e)
+
+    return "1.1.1.1"
 
 public_ip = get_public_ip()
 
@@ -247,9 +258,10 @@ def conver_to_db(inbound_protocol, outbound_protocol, inbound_connection, proxy)
         # 如果成功获取到公网 IP，则写入数据库
         try:
             tag = generate_tag()
-            new_conver = Conver(proxy_ip=public_ip, inbound_protocol=inbound_protocol, outbound_protocol=outbound_protocol, inbound_connections=inbound_connection,outbound_connections=proxy, tag=tag)
+            new_conver = Conver(proxy_ip=public_ip, inbound_protocol=inbound_protocol, outbound_protocol=outbound_protocol, inbound_connections=inbound_connection, outbound_connections=proxy, tag=tag)
             db.session.add(new_conver)
             db.session.commit()
+            logging.info(f"入站协议: {inbound_protocol} 出站协议 {outbound_protocol} 入站连接 {inbound_connection}, 创建成功")
         except Exception as e:
             logging.error("Error occurred while writing to database:", e)
 
