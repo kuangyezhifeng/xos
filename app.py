@@ -787,14 +787,14 @@ def conversion_create():
     if request.method == 'GET':
         # 可以在 GET 请求时执行一些初始化的操作
         return render_template('conversion_create.html', user=current_user)
-
     else:
         # 获取表单数据
         inbound_protocol = request.form.get('inbound_protocol')
         outbound_protocol = request.form.get('outbound_protocol')
+
         # 获取以回车分隔的多行代理 URL
         proxy_urls = [url.strip() for url in request.form.get('proxy_url').split('\n')]
-        generate_conversions(inbound_protocol,outbound_protocol,proxy_urls)
+        generate_conversions(inbound_protocol, outbound_protocol, proxy_urls)
         return redirect(url_for('conversion', user=current_user))
 
 

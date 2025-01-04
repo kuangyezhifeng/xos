@@ -3095,7 +3095,7 @@ def relay_connection_on(relay_connection):
     # 根据协议动态构造 socat 启动命令
     socat_command = f'socat -d TCP4-LISTEN:{source_port},reuseaddr,fork TCP4:{target_ip}:{target_port} 2>/dev/null &'
     if protocol == 'udp':
-        socat_command = (f'socat -d UDP4-LISTEN:{source_port},reuseaddr,fork UDP4:{target_ip}:{target_port} '
+        socat_command = (f'socat -T 30 -d UDP4-LISTEN:{source_port},reuseaddr,fork UDP4:{target_ip}:{target_port} '
                          f'2>/dev/null &')
     try:
         # 启动 socat 进程，设置子进程的进程组为新的会话
