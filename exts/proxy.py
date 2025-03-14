@@ -27,7 +27,8 @@ XRAY = '/etc/systemd/system/xray.service'
 XRAY_CHECK = '/etc/systemd/system/xray-check.service'
 INVALID_URL_MESSAGE = "无效的连接URL"
 EXISTING_OUTBOUND_MESSAGE = "已存在相同的出站配置"
-
+TPROXY_PORT = 12345
+TPROXY_IP = '127.0.0.1'
 test_result = {}
 update_in_progress = False
 
@@ -91,19 +92,6 @@ def update_handler():
         update_in_progress = False
 
 
-
-def create_chain_if_not_exists(table, chain):
-    # 检查链是否存在
-    check_exists_cmd = ['iptables', '-t', table, '-L', chain]
-    result = subprocess.run(check_exists_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    # 如果链不存在，则创建链
-    if result.returncode != 0:
-        create_cmd = ['iptables', '-t', table, '-N', chain]
-        subprocess.run(create_cmd)
-        logging.info(f"创建链 {chain}")
-
-
 def create_fwmark_rule_and_local_route():
     # 检查是否存在规则
     ip_rule = f"ip rule show"
@@ -119,101 +107,63 @@ def create_fwmark_rule_and_local_route():
         logging.info("XOS透明路由规则已经添加.")
 
 
+
 def reset_transparent_proxy_config():
     try:
         # 清除原有规则
-        subprocess.run(['iptables', '-F', '-t', 'mangle'])
+        subprocess.run('iptables -F -t mangle', shell=True)
 
         # 创建不存在的链
-        create_chain_if_not_exists('mangle', 'TP_MARK')
-        create_chain_if_not_exists('mangle', 'TP_OUT')
-        create_chain_if_not_exists('mangle', 'TP_PRE')
-        create_chain_if_not_exists('mangle', 'TP_RULE')
+        for chain in ['TP_MARK', 'TP_OUT', 'TP_PRE', 'TP_RULE']:
+            subprocess.run(f'iptables -t mangle -N {chain} 2>/dev/null || true', shell=True)
 
-        # 添加 TP_MARK 链规则
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_MARK', '-p', 'tcp', '-m', 'tcp', '--tcp-flags',
-             'FIN,SYN,RST,ACK', 'SYN',
-             '-j', 'MARK', '--set-xmark', '0x40/0x40'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_MARK', '-p', 'udp', '-m', 'conntrack', '--ctstate', 'NEW',
-             '-j', 'MARK',
-             '--set-xmark', '0x40/0x40'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_MARK', '-j', 'CONNMARK', '--save-mark', '--nfmask',
-             '0xffffffff',
-             '--ctmask', '0xffffffff'])
+        # === 入口链关联 ===
+        subprocess.run('iptables -t mangle -A PREROUTING -j TP_PRE; iptables -t mangle -A OUTPUT -j TP_OUT', shell=True)
 
-        # 添加 PREROUTING 链规则
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'PREROUTING', '-j', 'TP_PRE'])
+        # === 标记新连接 (TCP + UDP) ===
+        subprocess.run(
+            'iptables -t mangle -A TP_MARK -m conntrack --ctstate NEW -p tcp -j MARK --set-xmark 0x40/0x40; '
+            'iptables -t mangle -A TP_MARK -m conntrack --ctstate NEW -p udp -j MARK --set-xmark 0x40/0x40; '
+            'iptables -t mangle -A TP_MARK -j CONNMARK --save-mark', shell=True)
 
-        # 添加 TP_PRE 链规则
+        # === TP_OUT 链 (处理本地发出的流量) ===
         subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_PRE', '-i', 'lo', '-m', 'mark', '!', '--mark', '0x40/0xc0', '-j',
-             'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-I', 'TP_PRE', '-m', 'mark', '--mark', '0x80/0x80', '-j', 'DROP'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_PRE', '-p', 'tcp', '-m', 'addrtype', '!', '--src-type', 'LOCAL', '!',
-             '--dst-type', 'LOCAL', '-j', 'TP_RULE'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_PRE', '-p', 'udp', '-m', 'addrtype', '!', '--src-type', 'LOCAL', '!',
-             '--dst-type', 'LOCAL', '-j', 'TP_RULE'])
+            'iptables -t mangle -A TP_OUT -m owner --uid-owner 1001 -j RETURN; '
+            'iptables -t mangle -A TP_OUT -m mark --mark 0x80/0x80 -j RETURN; '
+            'iptables -t mangle -A TP_OUT -m addrtype --src-type LOCAL ! --dst-type LOCAL -j TP_RULE', shell=True)
 
+        # === TP_PRE 链 (处理外部流量) ===
         subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_PRE', '-p', 'tcp', '-m', 'mark', '--mark', '0x40/0xc0', '-j',
-             'TPROXY',
-             '--on-port', '12345', '--on-ip', '127.0.0.1', '--tproxy-mark', '0x0/0x0'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_PRE', '-p', 'udp', '-m', 'mark', '--mark', '0x40/0xc0', '-j',
-             'TPROXY',
-             '--on-port', '12345', '--on-ip', '127.0.0.1', '--tproxy-mark', '0x0/0x0'])
+            'iptables -t mangle -A TP_PRE -m mark --mark 0x80/0x80 -j RETURN; '
+            'iptables -t mangle -A TP_PRE -i lo -m mark ! --mark 0x40/0xc0 -j RETURN; '
+            'iptables -t mangle -A TP_PRE -m addrtype ! --src-type LOCAL ! --dst-type LOCAL -j TP_RULE; '
+            'iptables -t mangle -A TP_PRE -m mark --mark 0x40/0xc0 -p tcp -j TPROXY --on-port 12345 --on-ip 127.0.0.1; '
+            'iptables -t mangle -A TP_PRE -m mark --mark 0x40/0xc0 -p udp -j TPROXY --on-port 12345 --on-ip 127.0.0.1', shell=True)
 
-        # 添加 OUTPUT 链规则
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'OUTPUT', '-j', 'TP_OUT'])
-
-        # 添加 TP_OUT 链规则
+        # === TP_RULE 链 (处理具体规则) ===
         subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_OUT', '-m', 'mark', '--mark', '0x80/0x80', '-j', 'RETURN'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_OUT', '-p', 'tcp', '-m', 'addrtype', '--src-type', 'LOCAL', '!',
-             '--dst-type', 'LOCAL', '-j', 'TP_RULE'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_OUT', '-p', 'udp', '-m', 'addrtype', '--src-type', 'LOCAL', '!',
-             '--dst-type', 'LOCAL', '-j', 'TP_RULE'])
-
-        # 添加 TP_RULE 链规则
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-j', 'CONNMARK', '--restore-mark', '--nfmask',
-             '0xffffffff',
-             '--ctmask', '0xffffffff'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-m', 'mark', '--mark', '0x40/0xc0', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-i', 'docker+', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-i', 'br+', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-i', 'veth+', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-i', 'ppp+', '-j', 'RETURN'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-p', 'udp', '-m', 'udp', '--dport', '53', '-j',
-             'TP_MARK'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-p', 'tcp', '-m', 'tcp', '--dport', '53', '-j',
-             'TP_MARK'])
-        subprocess.run(
-            ['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-m', 'mark', '--mark', '0x40/0xc0', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-d', '10.0.0.0/8', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-d', '100.64.0.0/10', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-d', '169.254.0.0/16', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-d', '172.16.0.0/12', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-d', '192.168.0.0/16', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-d', '224.0.0.0/4', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-d', '240.0.0.0/4', '-j', 'RETURN'])
-        subprocess.run(['iptables', '-t', 'mangle', '-A', 'TP_RULE', '-j', 'TP_MARK'])
+            'iptables -t mangle -A TP_RULE -j CONNMARK --restore-mark; '
+            'iptables -t mangle -A TP_RULE -m mark --mark 0x40/0xc0 -j RETURN; '
+            'iptables -t mangle -A TP_RULE -i docker+ -j RETURN; '
+            'iptables -t mangle -A TP_RULE -i br+ -j RETURN; '
+            'iptables -t mangle -A TP_RULE -i veth+ -j RETURN; '
+            'iptables -t mangle -A TP_RULE -i ppp+ -j RETURN; '
+            'iptables -t mangle -A TP_RULE -p udp --dport 53 -j TP_MARK; '
+            'iptables -t mangle -A TP_RULE -p tcp --dport 53 -j TP_MARK; '
+            'iptables -t mangle -A TP_RULE -m mark --mark 0x40/0xc0 -j RETURN; '
+            'iptables -t mangle -A TP_RULE -d 10.0.0.0/8 -j RETURN; '
+            'iptables -t mangle -A TP_RULE -d 100.64.0.0/10 -j RETURN; '
+            'iptables -t mangle -A TP_RULE -d 169.254.0.0/16 -j RETURN; '
+            'iptables -t mangle -A TP_RULE -d 172.16.0.0/12 -j RETURN; '
+            'iptables -t mangle -A TP_RULE -d 192.168.0.0/16 -j RETURN; '
+            'iptables -t mangle -A TP_RULE -d 224.0.0.0/4 -j RETURN; '
+            'iptables -t mangle -A TP_RULE -d 240.0.0.0/4 -j RETURN; '
+            'iptables -t mangle -A TP_RULE -j TP_MARK', shell=True)
 
         logging.info("重置透明代理配置成功。")
 
     except Exception as e:
         logging.error("重置透明代理配置时发生错误：" + str(e))
-
     # 添加xray用户安装hysteria2程序
     xray_useradd()
 
@@ -1239,6 +1189,12 @@ def decode_hysteria2_url(hysteria2_url):
     random_port = random.randint(60000, 65534)
     result["socks5"] = {"listen": f"0.0.0.0:{random_port}"}
 
+    # 添加带宽配置
+    result["bandwidth"] = {
+        "up": "100 mbps",     # 最大上行带宽 100 Mbps
+        "down": "500 mbps"    # 最大下行带宽 500 Mbps
+    }
+
     return result
 
 
@@ -2212,16 +2168,30 @@ def xray_node_route_add(xray_config, decode_data, protocol):
                           (access_ip in rule.get("domain", []) and int(port) == int(rule.get("port", 0))) or
                           (access_ip in rule.get("ip", []) and int(port) == int(rule.get("port", 0)))), None)
 
-    if not existing_rule:
-        # 判断 access_ip 是域名还是IP地址
-        if is_ip_address(access_ip):
-            new_rule = {"type": "field", "outboundTag": "direct", "ip": [access_ip], "port": port}
-        else:
-            new_rule = {"type": "field", "outboundTag": "direct", "domain": [access_ip], "port": port}
-
-        xray_config["routing"].setdefault("rules", []).insert(0, new_rule)
+    if access_ip == "127.0.0.1":
+        logging.info(f"跳过 127.0.0.1 的路由规则: {access_ip}:{port}")
     else:
-        logging.warning(f"当前节点路由规则已经存在:{access_ip}:{port}")
+        if not existing_rule:
+            # 判断 access_ip 是域名还是IP地址
+            if is_ip_address(access_ip):
+                new_rule = {"type": "field", "outboundTag": "direct", "ip": [access_ip], "port": port}
+            else:
+                new_rule = {"type": "field", "outboundTag": "direct", "domain": [access_ip], "port": port}
+
+            xray_config["routing"].setdefault("rules", []).insert(0, new_rule)
+        else:
+            logging.warning(f"当前节点路由规则已经存在: {access_ip}:{port}")
+
+    # if not existing_rule:
+    #     # 判断 access_ip 是域名还是IP地址
+    #     if is_ip_address(access_ip):
+    #         new_rule = {"type": "field", "outboundTag": "direct", "ip": [access_ip], "port": port}
+    #     else:
+    #         new_rule = {"type": "field", "outboundTag": "direct", "domain": [access_ip], "port": port}
+    #
+    #     xray_config["routing"].setdefault("rules", []).insert(0, new_rule)
+    # else:
+    #     logging.warning(f"当前节点路由规则已经存在:{access_ip}:{port}")
 
 
 """
