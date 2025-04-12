@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from flask import redirect, url_for, flash
 from urllib.request import urlopen
+from urllib.parse import parse_qs, urlparse, unquote
 from base64 import urlsafe_b64decode
 from threading import Thread
 from app.models import *
@@ -1007,13 +1008,15 @@ def parse_vmess_subscription(subscribe_url):
 
 
 def decode_vless_link(vless_url):
-    # 定义正则表达式模式
-    pattern = r'vless://([^@]+)@([^:/?#]+):(\d+)([^#]*)(?:#([^@]+))?'
+    # 正则表达式模式：匹配 vless 链接的两种格式
+    pattern = r'vless://([^@]+)@([^:/?#]+):(\d+)([^#]*)(?:#([^?]+))?'
+
     # 匹配正则表达式
     match = re.match(pattern, vless_url)
 
     if match:
-        uuid, ip, port, query_fragment, email = match.groups()
+        # 提取 user_info 和地址、端口
+        user_info, ip, port, query_fragment, email = match.groups()
 
         # 判断 email 是否为 None
         if email:
@@ -1021,27 +1024,26 @@ def decode_vless_link(vless_url):
         else:
             email_prefix = ''
 
-        # 判断是否存在查询参数
-        if query_fragment:
-            # 提取查询参数
-            query_params = dict(re.findall(r'&?([^=]+)=([^&]*)', query_fragment))
-        else:
-            query_params = {}
+        # 解析 query 参数
+        query_params = dict(re.findall(r'&?([^=]+)=([^&]*)', query_fragment)) if query_fragment else {}
 
-        # 提取字段并构建字典
+        # 获取特定的字段并解码 path 和 spx
         vless_info = {
-            'uuid': uuid,
+            'uuid': user_info,
             'ip': ip,
             'port': int(port),
-            'encryption': query_params.get('encryption', ''),
+            'encryption': query_params.get('encryption', 'none'),
             'flow': query_params.get('flow', ''),
-            'security': query_params.get('security', ''),
+            'security': query_params.get('security', 'reality'),
             'sni': query_params.get('sni', ''),
             'fp': query_params.get('fp', ''),
             'pbk': query_params.get('pbk', ''),
-            'type': query_params.get('type', ''),
-            'headerType': query_params.get('headerType', ''),
+            'type': query_params.get('type', 'tcp'),
+            'headerType': query_params.get('headerType', 'none'),
             'email': email_prefix,
+            'path': unquote(query_params.get('path', '')),  # URL 解码
+            'spx': unquote(query_params.get('spx', '/')),  # 默认值为 '/'
+            'sid': query_params.get('sid', ''),
         }
 
         return vless_info
@@ -1865,8 +1867,11 @@ def generate_vmess_config(config, tag):
     return json_config
 
 
-
 def generate_vless_config(config, tag):
+    # 获取 email 和 security 的默认值
+    security = config.get('security', 'auto')
+
+    # 初始化基础的 JSON 配置
     json_config = {
         "tag": f"{tag}",
         "protocol": "vless",
@@ -1879,22 +1884,23 @@ def generate_vless_config(config, tag):
                         {
                             "id": config.get('uuid', ''),
                             "encryption": "none",
-                            "flow": config.get('flow', '')
+                            "flow": config.get('flow', ''),
+                            "security": security  # 使用 security 默认值
                         }
                     ]
                 }
             ]
         },
         "streamSettings": {
-            "network": "tcp",
+            "network": "tcp",  # 默认使用 TCP
             "security": "reality",
             "realitySettings": {
                 "serverName": config.get('sni', ''),
                 "fingerprint": "chrome",
                 "show": False,
                 "publicKey": config.get('pbk', ''),
-                "shortId": "",
-                "spiderX": ""
+                "shortId": config.get('sid', ''),  # 设置 shortId
+                "spiderX": "/"  # 默认使用 "/"
             },
             "sockopt": {
                 "mark": 128,
@@ -1906,7 +1912,19 @@ def generate_vless_config(config, tag):
             "concurrency": -1
         }
     }
+
+    # 根据 type 字段处理配置
+    if config.get('type', '') == 'xhttp':
+        json_config["streamSettings"]["network"] = "xhttp"
+        json_config["streamSettings"]["xhttpSettings"] = {
+            "path": config.get('path', ''),
+        }
+        # 如果有 spx 字段，则加入 spx 配置
+        if 'spx' in config:
+            json_config["streamSettings"]["realitySettings"]["spiderX"] = config.get('spx', '/')
+
     return json_config
+
 
 
 def generate_shadowsocks_config(ss_config, tag):
