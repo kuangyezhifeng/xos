@@ -185,8 +185,7 @@ def dashboard():
     page = request.args.get('page', 1, type=int)
 
     # 修改查询以按照指定顺序排序
-    proxies = ProxyDevice.query.order_by(ProxyDevice.gateway.desc(), ProxyDevice.status).paginate(page,
-                                                                                                  per_page=PER_PAGE)
+    proxies = ProxyDevice.query.order_by(ProxyDevice.gateway.desc(), ProxyDevice.status).paginate(page=page, per_page=PER_PAGE)
 
     return render_template('dashboard.html', user=user, proxies=proxies)
 
