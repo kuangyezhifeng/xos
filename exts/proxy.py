@@ -543,9 +543,8 @@ def gateway_route_set():
 
     # 如果 tags 为空，移除已存在的 "balancers" 和 "rules"
     if not tags:
-        # 移除balancers路由负载策略
-        if "balancers" in xray_config["routing"]:
-            del xray_config["routing"]["balancers"]
+        xray_config["routing"].pop("balancers", None)
+        xray_config.pop("observatory", None)
 
         # 移除默认网关路由规则
         if gateway_rule in rules_list:
@@ -567,18 +566,26 @@ def gateway_route_set():
         # 将数据库中查询到的 tags 直接替换为新的标签值
         replaced_tags = [tag for tag, in tags]
 
+        # 如果 tags 为空，移除已存在的 "balancers" 和 "rules"
+        if not tags:
+            xray_config["routing"].pop("balancers", None)
+            xray_config.pop("observatory", None)
+
         balancer = {
             "tag": "balancer",
             "selector": replaced_tags,
             "strategy": {
                 "type": "roundRobin"
-            }
+            },
+            "fallbackTag": "direct"
         }
-
-        # 移除已存在的 "balancers"
-        if "balancers" in xray_config["routing"]:
-            del xray_config["routing"]["balancers"]
-
+        # 添加 observatory
+        xray_config["observatory"] = {
+            "subjectSelector": replaced_tags,
+            "probeUrl": "https://www.google.com/generate_204",
+            "probeInterval": "10s",
+            "enableConcurrency": True
+        }
         # 添加新的 "balancers" 到列表中
         xray_config["routing"].setdefault("balancers", []).append(balancer)
 
@@ -610,7 +617,7 @@ def reset_xray_config():
     # Xray Config
     xray_config_content = {
         "log": {
-            "loglevel": "warning",
+            "loglevel": "debug",
             "error": "/var/log/xray/error.log",
             "access": "/var/log/xray/access.log"
         },
