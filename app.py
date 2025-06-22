@@ -1439,5 +1439,5 @@ if __name__ == '__main__':
     # 恢复运行的中转和路由规则
     restore_system_state()
     # 启动服务
-    socketio.run(app, port=80, host="0.0.0.0")
+    socketio.run(app, port=80, host="0.0.0.0", allow_unsafe_werkzeug=True)
     # socketio.run(app, port=8000, host="localhost")
