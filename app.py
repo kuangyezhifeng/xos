@@ -81,7 +81,10 @@ def get_realtime_data():
 # 用户加载回调函数
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    try:
+        return db.session.get(User, int(user_id))
+    except (ValueError, TypeError):
+        return None
 
 
 # 注册路由
