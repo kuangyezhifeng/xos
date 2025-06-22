@@ -6,7 +6,7 @@ import os
 
 # 配置日志
 logging.basicConfig(filename='/var/log/xos.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-LOCAL_HYSTERIA2 = "/usr/local/xos/static/hysteria2"
+LOCAL_HYSTERIA2 = "/usr/local/xos/xray/hysteria2"
 REMOTE_HYSTERIA2 = "/usr/bin"
 CONFIG_DIR = "/etc/hysteria2"
 

@@ -69,7 +69,7 @@ def update_handler():
         logging.info("flask模块检查并安装完毕")
 
         # 添加可执行权限
-        subprocess.run(["chmod", "+x", "/usr/local/xos/static/hysteria2"])
+        subprocess.run(["chmod", "+x", "/usr/local/xos/xray/hysteria2"])
         subprocess.run(["chmod", "+x", "/usr/local/xos/xray/xray"])
         subprocess.run(["chmod", "+x", "/usr/local/xos/static/xos.sh"])
 
@@ -1705,7 +1705,7 @@ After=network.target
 [Service]
 User=xray
 Group=xray
-ExecStart=/usr/local/xos/static/hysteria2 client -c {json_file_path}
+ExecStart=/usr/local/xos/xray/hysteria2 client -c {json_file_path}
 Restart=always
 RestartSec=5s
 
