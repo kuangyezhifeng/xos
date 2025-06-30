@@ -89,7 +89,7 @@ def export_excel(table_name):
     excel_data.seek(0)
 
     # 返回 Excel 文件
-    return send_file(excel_data, attachment_filename=f'{table_name}.xlsx', as_attachment=True)
+    return send_file(excel_data, download_name=f'{table_name}.xlsx', as_attachment=True)
 
 
 def import_excel(uploaded_file, table_name):
