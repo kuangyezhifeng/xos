@@ -541,9 +541,12 @@ def gateway_route_set():
     # 获取选中的 access_ip 对应的 tag 值
     tags = ProxyDevice.query.filter_by(gateway=1).with_entities(ProxyDevice.tag).all()
 
+    # 无论 tags 是否为空，先清除旧的 balancers 配置 ✅
+    xray_config["routing"]["balancers"] = []
+
+
     # 如果 tags 为空，移除已存在的 "balancers" 和 "rules"
     if not tags:
-        xray_config["routing"].pop("balancers", None)
         xray_config.pop("observatory", None)
 
         # 移除默认网关路由规则
