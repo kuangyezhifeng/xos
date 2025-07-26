@@ -369,19 +369,25 @@ proxy_on_off 路由处理函数用于处理 /proxy_on_off 路由的 GET 请求�
 @app.route('/proxy_on_off', methods=['GET', 'POST'])
 @login_required
 def node_on_off():
-    # 根据ID查询主IP信息
     if request.method == 'GET':
         id = request.args.get('id')
-        proxies = ProxyDevice.query.get(id)
+        proxies = db.session.get(ProxyDevice, id)
+        if proxies is None:
+            # 这里可以处理没查到的情况，比如返回错误或跳过
+            return "ProxyDevice not found", 404
         set_config(proxies)
 
     else:
         selected_items = request.form.getlist('selected_items[]')
         for id in selected_items:
-            proxies = ProxyDevice.query.get(id)
+            proxies = db.session.get(ProxyDevice, id)
+            if proxies is None:
+                # 处理异常，比如跳过该id继续
+                continue
             set_config(proxies)
 
     return redirect(url_for('dashboard'))
+
 
 
 
@@ -438,7 +444,7 @@ def node_update():
     if request.method == 'GET':
         id = request.args.get('id')
         # 根据ID查询代理设备信息
-        proxy_device = ProxyDevice.query.get(id)
+        proxy_device = db.session.get(ProxyDevice, id)
         return render_template('proxy_update.html', user=current_user, proxy_device=[proxy_device])
 
     else:
@@ -449,7 +455,7 @@ def node_update():
         note = request.form.get('note')
 
         # 根据ID找到要修改的代理设备
-        proxy_device = ProxyDevice.query.get(id)
+        proxy_device = db.session.get(ProxyDevice, id)
 
         # 更新指定字段的值
         proxy_device.node_ip = node_ip
@@ -480,13 +486,13 @@ def node_delete():
     id = request.args.get('id')
 
     if id:
-        proxy_device = ProxyDevice.query.get(id)
+        proxy_device = db.session.get(ProxyDevice, id)
         xray_node_delete_handler(proxy_device)
 
     else:
         selected_items = request.form.getlist('selected_items[]')
         for id in selected_items:
-            proxies = ProxyDevice.query.get(id)
+            proxies = db.session.get(ProxyDevice, id)
             xray_node_delete_handler(proxies)
             logging.info(f'已删除代理:{proxies.access_ip} 路由:{proxies.tag}')
 
@@ -616,7 +622,10 @@ def relay_on_off():
         selected_items = request.form.getlist('selected_items[]')
         exec_type = request.args.get('type')
         for id in selected_items:
-            relay_connection = RelayConnection.query.get(id)
+            relay_connection = db.session.get(RelayConnection, id)
+            if relay_connection is None:
+                # 处理未找到记录的逻辑
+                raise ValueError(f"RelayConnection with id {id} not found")
             process_single_relay(relay_connection, exec_type)
 
     return redirect(url_for('relay_connections'))
@@ -639,12 +648,12 @@ relay_update 路由处理函数用于处理 /relay_update 路由的 GET 和 POST
 def relay_update():
     if request.method == 'GET':
         id = request.args.get('id')
-        relay_info = RelayConnection.query.get(id)
+        relay_info = db.session.get(RelayConnection, id)
         return render_template('relay_update.html', user=current_user, relay_connections=[relay_info])
 
     elif request.method == 'POST':
         id = request.form.get('id')
-        relay_info = RelayConnection.query.get(id)
+        relay_info = db.session.get(RelayConnection, id)
         relay_info.protocol = request.form.get('protocol')
         relay_info.source_port = request.form.get('source_port')
         relay_info.target_port = request.form.get('target_port')
@@ -1007,7 +1016,7 @@ def host_status():
     elif request.method == 'POST':
         selected_items = request.form.getlist('selected_items[]')
         for host_id in selected_items:
-            host_record = Host.query.get(host_id)
+            host_record = db.session.get(Host, host_id)
             setup_ssh_key_authentication(host_record)
 
     return redirect(url_for('host', user=current_user))
@@ -1057,7 +1066,7 @@ def host_delete():
     elif request.method == 'POST':
         selected_items = request.form.getlist('selected_items[]')
         for host_id in selected_items:
-            host_record = Host.query.get(host_id)
+            host_record = db.session.get(Host, host_id)
             # 删除 Host_Config 表中与主机关联的记录
             host_config_entries = Host_Config.query.filter_by(main_ip=host_record.ip).all()
             for entry in host_config_entries:
@@ -1102,7 +1111,7 @@ def host_ips():
     elif request.method == 'POST':
         selected_items = request.form.getlist('selected_items[]')
         for host_id in selected_items:
-            host_info = Host.query.get(host_id)
+            host_info = db.session.get(Host, host_id)
             ip = host_info.ip
             username = host_info.account
             passwd = host_info.password
@@ -1163,7 +1172,7 @@ def xray_install():
     elif request.method == 'POST':
         selected_items = request.form.getlist('selected_items[]')
         for host_id in selected_items:
-            host_record = Host.query.get(host_id)
+            host_record = db.session.get(Host, host_id)
             remote_host = host_record.ip
             xray_remote_service_handler(remote_host)
 

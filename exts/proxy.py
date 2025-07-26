@@ -2288,10 +2288,10 @@ config_path: Xray 配置文件的路径，默认为 CONFIG_PATH。
 
 """
 
-
 def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
     decode_data, protocol = decode_proxy_link(proxy_url)
 
+    # 根据协议获取 IP 和端口
     if protocol == "socks":
         access_ip = decode_data.get("target_ip")
         port = decode_data.get("target_port")
@@ -2312,13 +2312,12 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
         access_ip = decode_data.get("server")
         port = decode_data.get("port")
 
-
     else:
         def extract_socks5_port(decode_data):
             directory = "/etc/hysteria2"
             target_server = decode_data.get("server")
             if not target_server:
-                return []
+                return None
 
             for filename in os.listdir(directory):
                 if filename.endswith(".json"):
@@ -2330,28 +2329,67 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
                             if socks5_listen:
                                 _, port = socks5_listen.split(":")
                                 return int(port)
+            return None
+
         access_ip = '127.0.0.1'
         port = extract_socks5_port(decode_data)
 
-    # 读取现有配置
+    # 转换端口为整数类型
+    try:
+        port = int(port)
+    except Exception:
+        logging.error(f"端口转换失败：{port}")
+        return
+
+    logging.info(f"[ROUTE REMOVE] 协议: {protocol}, IP: {access_ip}, PORT: {port}")
+
+    # 读取 Xray 配置
     xray_config = load_xray_config(config_path)
+    rules = xray_config.get("routing", {}).get("rules", [])
 
-    if is_ip_address(access_ip):
-        # 寻找规则中包含该 IP 和端口的规则，并移除对应的 IP 和端口
-        xray_config["routing"]["rules"] = [
-            rule for rule in xray_config["routing"]["rules"]
-            if not (rule.get("domain") == [access_ip] and rule.get("port") == port)
-        ]
+    def ip_match(ip, rule_ips):
+        for item in rule_ips:
+            try:
+                if '/' in item:
+                    if ipaddress.ip_address(ip) in ipaddress.ip_network(item, strict=False):
+                        return True
+                elif ip == item:
+                    return True
+            except Exception:
+                continue
+        return False
+
+    new_rules = []
+    for rule in rules:
+        matched = False
+        rule_ips = rule.get("ip", [])
+        rule_port = rule.get("port")
+
+        ip_matched = ip_match(access_ip, rule_ips)
+        port_matched = (rule_port == port)
+
+        # Debug 输出
+        logging.debug(f"[检查规则] IPs: {rule_ips}, Port: {rule_port} => IP匹配: {ip_matched}, 端口匹配: {port_matched}")
+
+        if ip_matched and port_matched:
+            rule['ip'] = [ip for ip in rule_ips if ip != access_ip]
+            if not rule['ip']:
+                logging.info(f"已清除规则: {rule}")
+                continue  # 整个规则 IP 为空时不保留
+            else:
+                logging.info(f"更新规则，移除 IP：{access_ip}")
+                new_rules.append(rule)
+        else:
+            new_rules.append(rule)
+
+    # 更新配置
+    xray_config["routing"]["rules"] = new_rules
+
+    # 保存配置
+    if save_xray_config(xray_config, config_path):
+        logging.info(f"✅ 成功移除节点出站规则: {protocol}://{access_ip}:{port}")
     else:
-        # 寻找规则中包含该域名和端口的规则，并移除对应的域名和端口
-        xray_config["routing"]["rules"] = [
-            rule for rule in xray_config["routing"]["rules"]
-            if not (rule.get("domain") == [access_ip] and rule.get("port") == port)
-        ]
-    logging.info(f"已成功移除节点出站路由规则:{protocol}:{access_ip}:{port}")
-    # 保存更新后的配置
-    save_xray_config(xray_config, config_path)
-
+        logging.error("❌ Xray 配置保存失败")
 
 '''
  get_device_addresses 函数的功能描述如下：
