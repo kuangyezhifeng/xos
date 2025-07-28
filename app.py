@@ -1069,7 +1069,7 @@ def host_status():
 def host_update():
     if request.method == 'POST':
         id = request.form.get('id')
-        host = Host.query.get(id)
+        host = db.session.get(Host, id)
         if host:
             # 使用字典解析简化参数获取
             update_data = {key: request.form.get(key) for key in

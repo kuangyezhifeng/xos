@@ -28,6 +28,7 @@
             color: #222; /* 黑色文字 */
         }
 
+/* 按钮基础样式 */
         .btn {
             min-width: 30px;
             font-weight: 600;
@@ -36,20 +37,20 @@
         }
 
         .btn:hover:not(.disabled) {
-            background-color: #2e2c2f;
+            background-color: rgba(119, 119, 111, 0.5);
             border-color: rgba(119, 119, 111, 0.5);
-            color: white;
+            color: rgba(255, 255, 255, 0.42);
         }
 
         .btn-primary {
-            background: linear-gradient(90deg, #2e2c2f, rgba(119, 119, 111, 0.5));
+            background: linear-gradient(90deg, rgba(119, 119, 111, 0.5), rgba(119, 119, 111, 0.5));
             border: none;
-            color: #05e105;
+            color: #08a808;
             font-weight: 700;
         }
 
         .btn-primary:hover {
-            background: linear-gradient(90deg, rgb(46, 44, 47), rgba(119, 119, 111, 0.5));
+            background: linear-gradient(90deg, rgba(119, 119, 111, 0.5), rgba(119, 119, 111, 0.5));
         }
 
         .ml-2 {
@@ -84,17 +85,9 @@
                 <th style="width: 5%"><i class="fas fa-edit"></i>备注</th>
                 <th style="width: 5%"><i class="fas fa-wifi"></i>WiFi</th>
                 <th style="width: 5%"><i class="fas fa-power-off"></i>启停</th>
-                <th style="width: 5%;">
-                    <div class="form-check m-0 d-flex justify-content-center align-items-center gap-2">
-                        <!-- 复选框 -->
-                        <input class="form-check-input" type="checkbox" id="select-all"
-                               style="width: 1.25rem; height: 1.25rem;">
-                        <!-- label 包含图标和文字 -->
-                        <label class="form-check-label d-flex align-items-center gap-1 mb-0" for="select-all"
-                               style="color: white; cursor: pointer;">
-                            <i class="fas fa-check-square"></i>
-                        </label>
-                    </div>
+                <th style="width: 2%;">
+                    <i class="fas fa-check-square text-white me-1"></i>
+                    <input type="checkbox" id="select-all">
                 </th>
             </tr>
             </thead>

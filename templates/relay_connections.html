@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 {% block styles %}
     {{ super() }}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
     <style>
         /* 毛玻璃 + 白底半透明背景 */
         .custom-table {
@@ -90,19 +92,12 @@
                 <th style="width: 10%;"><i class="fas fa-sign-in-alt"></i> 源端口</th>
                 <th style="width: 15%;"><i class="fas fa-arrow-right"></i> 目标 IP</th>
                 <th style="width: 10%;"><i class="fas fa-sign-out-alt"></i> 目标端口</th>
-                <th style="width: 20%;"><i class="fas fa-sticky-note"></i> 备注</th>
-                <th style="width: 5%;"><i class="fas fa-edit" title="修改"></i>修改</th>
-                <th style="width: 5%;"><i class="fas fa-power-off" title="启用/禁用"></i>启停</th>
-                <th style="width: 1%;">
-                    <div class="form-check d-flex justify-content-center align-items-center gap-2">
-                        <!-- 隐藏原生复选框 -->
-                        <input class="form-check-input visually-hidden" type="checkbox" id="select-all"/>
-                        <!-- label 包含图标和文字 -->
-                        <label for="select-all" class="form-check-label d-flex align-items-center gap-1 mb-0"
-                               style="color: white; cursor: pointer;">
-                            <i class="far fa-square" id="fa-checkbox"></i>
-                        </label>
-                    </div>
+                <th style="width: 20%;"><i class="fas fa-sticky-note"></i>备注</th>
+                <th style="width: 2%;"><i class="fas fa-edit" title="修改"></i></th>
+                <th style="width: 2%;"><i class="fas fa-power-off" title="启用/禁用"></i></th>
+                <th style="width: 2%;">
+                    <i class="fas fa-check-square text-white me-1"></i>
+                    <input type="checkbox" id="select-all">
                 </th>
             </tr>
             </thead>
@@ -114,8 +109,13 @@
                     <td>{{ relay.source_port }}</td>
                     <td>{{ relay.target_ip }}</td>
                     <td>{{ relay.target_port }}</td>
-                    <td>{{ relay.note }}</td>
-                    <td>
+<td>
+  {% if relay.note %}
+      [{{ relay.note }}]
+  {% else %}
+      <i class="fas fa-file text-muted" title="无备注"></i>
+  {% endif %}
+</td>             <td>
                         <a class="btn btn-success btn-sm" href="{{ url_for('relay_update', id=relay.id) }}"
                            title="修改">
                             <i class="fas fa-edit"></i>
@@ -188,7 +188,7 @@
                 <td class="text-center">
                     <button type="submit" class="btn btn-success btn-sm"
                             formaction="{{ url_for('relay_on_off', type='on') }}">
-                        <i class="fas fa-toggle-on"></i> 启用选中
+                        <i class="fas fa-toggle-on"></i> 启用
                     </button>
                 </td>
 
@@ -196,7 +196,7 @@
                 <td class="text-center">
                     <button type="submit" class="btn btn-warning btn-sm"
                             formaction="{{ url_for('relay_on_off', type='off') }}">
-                        <i class="fas fa-toggle-off"></i> 禁用选中
+                        <i class="fas fa-toggle-off"></i> 禁用
                     </button>
                 </td>
 
@@ -204,7 +204,7 @@
                 <td class="text-center">
                     <button type="submit" class="btn btn-danger btn-sm"
                             formaction="{{ url_for('relay_on_off', type='delete') }}">
-                        <i class="fas fa-trash-alt"></i> 删除选中
+                        <i class="fas fa-trash-alt"></i> 删除
                     </button>
                 </td>
             </tr>
