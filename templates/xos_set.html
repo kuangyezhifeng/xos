@@ -4,93 +4,140 @@
     {{ super() }}
     <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
     <script src="/static/js/bootstrap.min.js"></script>
-    <body style="background:url(static/images/wildlee.svg) no-repeat center; background-position: center 0; background-size: cover; margin: 0px;">
     <style>
-        .signin-container {
-            background-color: #e85629;
-            opacity: 0.9;
-            width: 480px;
-            margin: 10% auto;
-            padding: 30px;
-            border-radius: 10px;
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: url(/static/images/wildlee.svg) no-repeat center center fixed;
+            background-size: cover;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        }
 
+        .signin-container {
+            background: linear-gradient(135deg, rgba(232, 86, 41, 0.85), rgba(255, 128, 64, 0.85));
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            max-width: 480px;
+            margin: 10% auto;
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+            color: white;
         }
 
         .form-control {
             border-radius: 5px;
-            color: black; /* 将文本颜色更改为可见的颜色 */
-            background-color: white; /* 将背景颜色更改为可见的颜色 */
+            color: black;
+            background-color: white;
+            border: 1px solid #ddd;
         }
 
         .btn {
             border-radius: 5px;
+            font-weight: 600;
+            background-color: #fff;
+            color: #e85629;
+            border: 2px solid #e85629;
+            transition: all 0.25s ease-in-out;
+        }
+
+        .btn:hover {
+            background-color: #e85629;
+            color: white;
+            border-color: #ff8c4a;
         }
 
         .button-container {
             display: flex;
             justify-content: space-between;
+            margin-top: 30px;
         }
 
-        /* 使用 col-form-label 类替代 control-label，设置左对齐 */
-        .col-form-label {
-            text-align: left !important;
-            color: white; /* 设置标签字体颜色为白色 */
+        .form-check {
+            margin-right: 20px;
+        }
+
+        .form-check-label {
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        label.col-form-label {
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
         }
     </style>
 {% endblock %}
 
 {% block content %}
-    <div class="signin-container">
-        <form class="form-horizontal" method="post" action="{{ url_for('xos_config') }}">
-             <div class="form-group row text-center">
-                <label class="col-sm-4  text-white">代理模式>{% if config.proxy_mode %}透明代理{% else %}本地直连{% endif %}</label>
-                <div class="col-sm-12">
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="proxy_mode" id="transparent_proxy" value="transparent">
-                        <label class="form-check-label text-white" for="transparent_proxy">透明代理</label>
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="proxy_mode" id="local_direct" value="local">
-                        <label class="form-check-label text-white" for="local_direct">本地直连</label>
-                    </div>
+<div class="signin-container">
+    <form method="post" action="{{ url_for('xos_config') }}">
+        <!-- 代理模式 -->
+        <div class="form-group">
+            <label class="col-form-label">代理模式 &nbsp;<small>{% if config.proxy_mode %}透明代理{% else %}本地直连{% endif %}</small></label>
+            <div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="proxy_mode" id="transparent_proxy" value="transparent"
+                        {% if config.proxy_mode %}checked{% endif %}>
+                    <label class="form-check-label" for="transparent_proxy">透明代理</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="proxy_mode" id="local_direct" value="local"
+                        {% if not config.proxy_mode %}checked{% endif %}>
+                    <label class="form-check-label" for="local_direct">本地直连</label>
                 </div>
             </div>
-            <div class="form-group row text-center">
-                <label class="col-sm-4  text-white">代理分享>{% if config.proxy_share %}分享模式{% else %}禁用分享{% endif %}</label>
-                <div class="col-sm-12">
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="proxy_share" id="enable_proxy" value="enable">
-                        <label class="form-check-label text-white" for="enable_proxy">启用分享</label>
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="proxy_share" id="disable_proxy" value="disable">
-                        <label class="form-check-label text-white" for="disable_proxy">关闭分享</label>
-                    </div>
-                </div>
-            </div>
+        </div>
 
-            <div class="form-group row text-center">
-                <label class="col-sm-4  text-white">页面行数>每页{{ config.page_rows }}</label>
-                <div class="col-sm-12">
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="page_rows" id="page_25" value="25">
-                        <label class="form-check-label text-white" for="page_25">25</label>
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="page_rows" id="page_100" value="100">
-                        <label class="form-check-label text-white" for="page_100">100</label>
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="page_rows" id="page_1000" value="1000">
-                        <label class="form-check-label text-white" for="page_1000">1000</label>
-                    </div>
+        <!-- 代理分享 -->
+        <div class="form-group">
+            <label class="col-form-label">代理分享 &nbsp;<small>{% if config.proxy_share %}分享模式{% else %}禁用分享{% endif %}</small></label>
+            <div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="proxy_share" id="enable_proxy" value="enable"
+                        {% if config.proxy_share %}checked{% endif %}>
+                    <label class="form-check-label" for="enable_proxy">启用分享</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="proxy_share" id="disable_proxy" value="disable"
+                        {% if not config.proxy_share %}checked{% endif %}>
+                    <label class="form-check-label" for="disable_proxy">关闭分享</label>
                 </div>
             </div>
-            <div class="button-container mt-12" style="display: flex; color: #808080;">
-                <button type="submit" class="btn col-sm-4">保存</button>
-                <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn col-sm-4">返回
-                </button>
+        </div>
+
+        <!-- 页面行数 -->
+        <div class="form-group">
+            <label class="col-form-label">页面行数 &nbsp;<small>每页 {{ config.page_rows }}</small></label>
+            <div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="page_rows" id="page_25" value="25"
+                        {% if config.page_rows == 25 %}checked{% endif %}>
+                    <label class="form-check-label" for="page_25">25</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="page_rows" id="page_100" value="100"
+                        {% if config.page_rows == 100 %}checked{% endif %}>
+                    <label class="form-check-label" for="page_100">100</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="page_rows" id="page_1000" value="1000"
+                        {% if config.page_rows == 1000 %}checked{% endif %}>
+                    <label class="form-check-label" for="page_1000">1000</label>
+                </div>
             </div>
-        </form>
-    </div>
+        </div>
+
+        <div class="button-container">
+            <button type="submit" class="btn col-sm-5">保存</button>
+            <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn col-sm-5">返回</button>
+        </div>
+    </form>
+</div>
 {% endblock %}

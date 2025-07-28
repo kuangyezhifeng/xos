@@ -1,113 +1,222 @@
 {% extends 'base.html' %}
+{% block styles %}
+    {{ super() }}
+    <style>
+        /* 毛玻璃 + 白底半透明背景 */
+        .custom-table {
+            border-collapse: collapse !important;
+            background: rgba(255, 255, 255, 0.7); /* 白色半透明 */
+            backdrop-filter: blur(12px);
+            border-radius: 14px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            width: 100%;
+            color: #222; /* 黑色文字 */
+        }
+
+        /* 单元格样式 */
+        .custom-table tbody td {
+            border-bottom: 1.5px solid rgba(0, 0, 0, 0.1);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 0.5rem 0.75rem;
+            vertical-align: middle !important;
+            color: #222; /* 黑字 */
+        }
+
+        /* 去掉最后一列的右边框 */
+        .custom-table tr th:last-child,
+        .custom-table tr td:last-child {
+            border-right: none !important;
+        }
+
+        /* badge 圆点数字，保持橙红渐变 */
+        .badge-number {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 8px;
+            background: linear-gradient(135deg, rgb(46, 44, 47), #2e2c2f);
+            color: #05e105;
+            box-shadow: 0 0 6px rgba(119, 119, 111, 0.5);
+        }
+
+        /* 按钮基础样式 */
+        .btn {
+            min-width: 30px;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover:not(.disabled) {
+            background-color: rgba(119, 119, 111, 0.5);
+            border-color: rgba(119, 119, 111, 0.5);
+            color: rgba(255, 255, 255, 0.42);
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, rgba(119, 119, 111, 0.5), rgba(119, 119, 111, 0.5));
+            border: none;
+            color: #08a808;
+            font-weight: 700;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(90deg, rgba(119, 119, 111, 0.5), rgba(119, 119, 111, 0.5));
+        }
+
+        .ml-2 {
+            margin-left: 0.5rem !important;
+        }
+
+        .no-border {
+            border: none !important;
+        }
+
+    </style>
+{% endblock %}
 
 {% block content %}
     <form method="post">
-        <table class="table table-hover custom-table" style="word-break: break-all; word-wrap: break-word;">
-            <tr class="bg-dark">
-                <td class="text-white" style="width: 10%;">编号</td>
-                <td class="text-white" style="width: 10%;">协议</td>
-                <td class="text-white" style="width: 10%;">源端口</td>
-                <td class="text-white" style="width: 15%;">目标IP</td>
-                <td class="text-white" style="width: 10%;">目标端口</td>
-                <td class="text-white" style="width: 10%;">路由</td>
-                <td class="text-white" style="width: 20%;">备注</td>
-                <td class="text-white" style="width: 3%;">修改</td>
-                <td class="text-white" style="width: 3%;">启动</td>
-
-                <td style="color: white; width:3%;">
-                    <input type="checkbox" id="select-all"> 全选
-                </td>
+        <table class="table table-hover custom-table">
+            <thead class="bg-dark text-white">
+            <tr>
+                <th style="width: 6%;"><i class="fas fa-hashtag"></i> 编号</th>
+                <th style="width: 10%;"><i class="fas fa-network-wired"></i> 协议</th>
+                <th style="width: 10%;"><i class="fas fa-sign-in-alt"></i> 源端口</th>
+                <th style="width: 15%;"><i class="fas fa-arrow-right"></i> 目标 IP</th>
+                <th style="width: 10%;"><i class="fas fa-sign-out-alt"></i> 目标端口</th>
+                <th style="width: 20%;"><i class="fas fa-sticky-note"></i> 备注</th>
+                <th style="width: 5%;"><i class="fas fa-edit" title="修改"></i>修改</th>
+                <th style="width: 5%;"><i class="fas fa-power-off" title="启用/禁用"></i>启停</th>
+                <th style="width: 1%;">
+                    <div class="form-check d-flex justify-content-center align-items-center gap-2">
+                        <!-- 隐藏原生复选框 -->
+                        <input class="form-check-input visually-hidden" type="checkbox" id="select-all"/>
+                        <!-- label 包含图标和文字 -->
+                        <label for="select-all" class="form-check-label d-flex align-items-center gap-1 mb-0"
+                               style="color: white; cursor: pointer;">
+                            <i class="far fa-square" id="fa-checkbox"></i>
+                        </label>
+                    </div>
+                </th>
             </tr>
-            <!-- 将传上来的 connections 进行遍历 输出HTML标签 -->
+            </thead>
+            <tbody>
             {% for relay in connections.items %}
                 <tr>
-                    <td><span class="badge">{{ loop.index }}</span></td>
+                    <td><span class="badge-number">{{ loop.index }}</span></td>
                     <td>{{ relay.protocol }}</td>
                     <td>{{ relay.source_port }}</td>
                     <td>{{ relay.target_ip }}</td>
                     <td>{{ relay.target_port }}</td>
-                    <td>{{ relay.tag }}</td>
                     <td>{{ relay.note }}</td>
                     <td>
-                        <a class="btn btn-success" href="{{ url_for('relay_update', id=relay.id) }}">修改</a>
+                        <a class="btn btn-success btn-sm" href="{{ url_for('relay_update', id=relay.id) }}"
+                           title="修改">
+                            <i class="fas fa-edit"></i>
+                        </a>
                     </td>
-
                     <td>
                         {% if relay.status == '1' %}
-                            <a class="btn btn-success"
-                               href="{{ url_for('relay_on_off', type='off', id=relay.id) }}">启用</a>
+                            <a class="btn btn-success btn-sm"
+                               href="{{ url_for('relay_on_off', type='off', id=relay.id) }}" title="启用">
+                                <i class="fas fa-toggle-on"></i>
+                            </a>
                         {% elif relay.status == '已关闭' %}
-                            <a class="btn btn-danger"
-                               href="{{ url_for('relay_on_off', type='off', id=relay.id) }}">{{ relay.status }}</a>
+                            <a class="btn btn-danger btn-sm"
+                               href="{{ url_for('relay_on_off', type='off', id=relay.id) }}" title="已关闭">
+                                <i class="fas fa-toggle-off"></i>
+                            </a>
                         {% else %}
-                            <a class="btn btn-warning"
-                               href="{{ url_for('relay_on_off', type='on', id=relay.id) }}">禁用</a>
+                            <a class="btn btn-warning btn-sm"
+                               href="{{ url_for('relay_on_off', type='on', id=relay.id) }}" title="禁用">
+                                <i class="fas fa-toggle-off"></i>
+                            </a>
                         {% endif %}
                     </td>
-                    <td>
+                    <td class="text-center">
                         <input type="checkbox" name="selected_items[]" value="{{ relay.id }}">
                     </td>
                 </tr>
             {% endfor %}
-
-            <tr class="bg-dark">
-                <!-- 分页导航 -->
-                <td colspan="7">
-                    <span class="badge badge-secondary mr-2">第 {{ connections.page }} 页</span>
+            </tbody>
+            <tfoot>
+            <tr class="bg-dark text-white">
+                <!-- 分页栏，7列合并，内容居中 -->
+                <td colspan="6" class="text-center">
+                    <span class="badge bg-secondary">第 {{ connections.page }} 页</span>
                     {% if connections.has_prev %}
-                        <a class="btn btn-secondary ml-2"
-                           href="{{ url_for('relay_connections', page=connections.prev_num) }}">上一页</a>
+                        <a class="btn btn-secondary btn-sm ms-2"
+                           href="{{ url_for('relay_connections', page=connections.prev_num) }}">
+                            <i class="fas fa-chevron-left"></i> 上一页
+                        </a>
                     {% else %}
-                        <a class="btn btn-secondary ml-2 disabled" href="#">上一页</a>
+                        <button class="btn btn-secondary btn-sm ms-2" disabled><i class="fas fa-chevron-left"></i> 上一页
+                        </button>
                     {% endif %}
 
                     {% for num in connections.iter_pages() %}
                         {% if num %}
                             {% if num != connections.page %}
-                                <a class="btn btn-secondary ml-2"
+                                <a class="btn btn-secondary btn-sm ms-1"
                                    href="{{ url_for('relay_connections', page=num) }}">{{ num }}</a>
                             {% else %}
-                                <span class="btn btn-primary ml-2">{{ num }}</span>
+                                <span class="btn btn-primary btn-sm ms-1">{{ num }}</span>
                             {% endif %}
                         {% else %}
-                            <span class="btn btn-secondary ml-2 disabled">...</span>
+                            <span class="btn btn-secondary btn-sm ms-1 disabled">...</span>
                         {% endif %}
                     {% endfor %}
 
                     {% if connections.has_next %}
-                        <a class="btn btn-secondary ml-2"
-                           href="{{ url_for('relay_connections', page=connections.next_num) }}">下一页</a>
+                        <a class="btn btn-secondary btn-sm ms-2"
+                           href="{{ url_for('relay_connections', page=connections.next_num) }}">
+                            下一页 <i class="fas fa-chevron-right"></i>
+                        </a>
                     {% else %}
-                        <a class="btn btn-secondary ml-2 disabled" href="#">下一页</a>
+                        <button class="btn btn-secondary btn-sm ms-2" disabled>下一页 <i
+                                class="fas fa-chevron-right"></i></button>
                     {% endif %}
+                </td>
 
-                </td>
-                <!-- 表单按钮 -->
-                <td class="text-right" style="color: white;">
-                    <button type="submit" class="btn btn-success" formaction="{{ url_for('relay_on_off', type='on') }}">
-                        启动
+                <!-- 启用选中 -->
+                <td class="text-center">
+                    <button type="submit" class="btn btn-success btn-sm"
+                            formaction="{{ url_for('relay_on_off', type='on') }}">
+                        <i class="fas fa-toggle-on"></i> 启用选中
                     </button>
                 </td>
-                <td class="text-right" style="color: white;">
-                    <button type="submit" class="btn btn-success"
-                            formaction="{{ url_for('relay_on_off', type='off') }}">禁用
+
+                <!-- 禁用选中 -->
+                <td class="text-center">
+                    <button type="submit" class="btn btn-warning btn-sm"
+                            formaction="{{ url_for('relay_on_off', type='off') }}">
+                        <i class="fas fa-toggle-off"></i> 禁用选中
                     </button>
                 </td>
-                <td class="text-right" style="color: white;">
-                    <button type="submit" class="btn btn-success"
-                            formaction="{{ url_for('relay_on_off', type='delete') }}">删除
+
+                <!-- 删除选中 -->
+                <td class="text-center">
+                    <button type="submit" class="btn btn-danger btn-sm"
+                            formaction="{{ url_for('relay_on_off', type='delete') }}">
+                        <i class="fas fa-trash-alt"></i> 删除选中
                     </button>
                 </td>
             </tr>
+            </tfoot>
+
         </table>
     </form>
+
     <script>
-        // JavaScript代码，用于处理全选/取消全选逻辑
         document.getElementById('select-all').addEventListener('change', function () {
-            var checkboxes = document.getElementsByName('selected_items[]');
-            for (var i = 0; i < checkboxes.length; i++) {
-                checkboxes[i].checked = this.checked;
-            }
+            const checkboxes = document.querySelectorAll('input[name="selected_items[]"]');
+            checkboxes.forEach(cb => cb.checked = this.checked);
         });
     </script>
 {% endblock %}

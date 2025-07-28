@@ -3,281 +3,361 @@
 {% block styles %}
     {{ super() }}
     <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <link rel="stylesheet" href="/static/css/all.min.css">
     <link rel="icon" href="/static/images/favicon-16x16.png" sizes="16x16" type="image/png">
     <link rel="icon" href="/static/images/favicon-32x32.png" sizes="32x32" type="image/png">
-{% endblock %}
 
+    <style>
+        /* 推荐字体组合：Montserrat + Open Sans */
+        /* 你可以下载这两款字体放在本地，或用Google Fonts在线加载 */
+        @font-face {
+            font-family: 'Montserrat';
+            src: url('/static/fonts/Montserrat-Thin.woff2') format('woff2'),
+            url('/static/fonts/Montserrat-Thin.woff') format('woff');
+            font-weight: 500;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'Open Sans';
+            src: url('/static/fonts/OpenSans-Regular.woff2') format('woff2'),
+            url('/static/fonts/OpenSans-Regular.woff') format('woff');
+            font-weight: 400;
+            font-style: normal;
+        }
+
+        /* 标题用Montserrat更现代 */
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Montserrat', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-weight: 600;
+            color: #222;
+            margin-bottom: 0.5rem;
+        }
+
+        /* dropdown菜单美化 */
+        .dropdown-menu .dropdown-item {
+            padding-top: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e9ecef;
+            font-weight: 500;
+            font-size: 14.5px;
+            transition: background-color 0.3s ease;
+        }
+
+        .dropdown-menu .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-menu .dropdown-item:hover,
+        .dropdown-menu .dropdown-item:focus {
+            background-color: #ff5722;
+            color: white;
+        }
+
+        /* 按钮字体稍微加粗 */
+        .btn {
+            font-weight: 600;
+            letter-spacing: 0.03em;
+        }
+
+        /* 表格、按钮等也可以单独加粗 */
+        table td, table th {
+            font-weight: 600;
+        }
+
+        .btn {
+            font-weight: 700;
+        }
+
+        .badge-number {
+            font-weight: 700;
+        }
+
+    </style>
+{% endblock %}
 {% block navbar %}
-    <nav class="navbar navbar-icon-top navbar-expand-lg navbar-dark bg-dark">
-        <a class="navbar-brand" href="#">
-            <span class="glyphicon glyphicon-cloud" aria-hidden="true"></span>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <a class="navbar-brand xos-logo-badge d-flex align-items-center gap-2" href="#">
+            <i class="fas fa-cloud"></i>
+            <span>XOS</span>
         </a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
-                aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <button class="navbar-toggler" type="button" data-toggle="collapse"
+                data-target="#navbarContent" aria-controls="navbarContent"
+                aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
 
-        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <div class="collapse navbar-collapse" id="navbarContent">
+            <!-- 左侧菜单 -->
             <ul class="navbar-nav mr-auto">
                 <li class="nav-item active">
                     <a class="nav-link" href="{{ url_for('dashboard') }}">
-                        <i class="fa fa-home"></i>
-                        <strong>XOS</strong>
-                        <span class="sr-only">(current)</span>
+                        <i class="fas fa-home mr-1"></i> 控制面板
                     </a>
                 </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown1" role="button"
-                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="fa fa-envelope-o">
-                            <span class="badge badge-success" role="button">SYSTEM</span>
-                        </i>
-                        系统功能
-                    </a>
-                    <div class="dropdown-menu" aria-labelledby="navbarDropdown1">
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('system',exec_type='restart') }}">重启服务</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('gateway_select') }}">设置网关</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('xos_config') }}">参数设置</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('update') }}">系统更新</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('system',exec_type='tproxy') }}">重置代理</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('system',exec_type='xray') }}">重置配置</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('system',exec_type='database') }}"><b>清空数据</b></a>
-                        <div class="dropdown-divider"></div>
-                    </div>
-                </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
-                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="fa fa-envelope-o">
-                            <span class="badge badge-success" role="button">PROXIES</span>
-                        </i>
-                        创建节点
-                    </a>
-                    <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('dashboard') }}">代理清单</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('get_ip_info') }}">解析代理</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='vmess') }}">VMESS</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='vless') }}">VLESS</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='socks') }}">SOCKS</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='trojan') }}">TROJAN</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='hysteria2') }}">HYSTERIA2</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='shadowsocks') }}">SHADOWSOCKS</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='subscribe') }}">订阅添加</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='proxy_devices') }}">导出EXCEL</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='proxy_devices') }}">导入EXCEL</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('database',type='proxy') }}">清空代理</a>
-                        <div class="dropdown-divider"></div>
-                    </div>
-                </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
-                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="fa fa-envelope-o">
-                            <span class="badge badge-success" role="button">FORWARD</span>
-                        </i>
-                        中转连接
-                    </a>
-                    <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('relay_connections',type='look') }}">中转清单</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('relay_connections',type= 'add') }}">添加中转</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('relay_on_off',type= 'on') }}">启动中转</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('test_all_ports') }}">测试中转</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('relay_on_off',type= 'off') }}">禁用中转</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='relay_connections') }}">导出EXCEL</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='relay_connections') }}">导入EXCEL</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('database',type='forward') }}">清空中转</a>
-                        <div class="dropdown-divider"></div>
 
+                <!-- 系统功能 -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="systemMenu" role="button"
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-cogs mr-1 text-info"></i> 系统功能
+                    </a>
+                    <div class="dropdown-menu" aria-labelledby="systemMenu">
+                        <a class="dropdown-item" href="{{ url_for('system', exec_type='restart') }}">
+                            <i class="fas fa-sync-alt mr-2 text-secondary"></i> 重启服务
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('gateway_select') }}">
+                            <i class="fas fa-network-wired mr-2 text-success"></i> 设置网关
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('xos_config') }}">
+                            <i class="fas fa-sliders-h mr-2 text-warning"></i> 参数设置
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('update') }}">
+                            <i class="fas fa-download mr-2 text-info"></i> 系统更新
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('system', exec_type='xos') }}">
+                            <i class="fas fa-redo-alt mr-2 text-danger"></i> 重启面板
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('system', exec_type='xray') }}">
+                            <i class="fas fa-cogs mr-2 text-secondary"></i> 重置配置
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('system', exec_type='database') }}">
+                            <i class="fas fa-trash-alt mr-2 text-danger"></i> <strong>清空数据</strong>
+                        </a>
                     </div>
                 </li>
 
+                <!-- 创建节点 -->
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
+                    <a class="nav-link dropdown-toggle" href="#" id="proxyMenu" role="button"
                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="fa fa-envelope-o">
-                            <span class="badge badge-success" role="button">CONVERSION</span>
-                        </i>
-                        协议转换
+                        <i class="fas fa-server mr-1 text-success"></i> 创建节点
                     </a>
-                    <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('conversion')}}">转换清单</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('conversion_create',type='crate') }}">添加转换</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('conversion_select') }}">提取代理</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('conversion_enable') }}">启动转换</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('conversion_disable') }}">禁用转换</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='conversion') }}">导出EXCEL</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='conversion') }}">导入EXCEL</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('database',type='conversion') }}">清空转换</a>
-                        <div class="dropdown-divider"></div>
+                    <div class="dropdown-menu" aria-labelledby="proxyMenu">
+                        <a class="dropdown-item" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-list-ul mr-2 text-primary"></i> 代理清单
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('get_ip_info') }}">
+                            <i class="fas fa-search-location mr-2 text-info"></i> 解析代理
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='vmess') }}">
+                            <i class="fas fa-bolt mr-2 text-warning"></i> VMESS
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='vless') }}">
+                            <i class="fas fa-link mr-2 text-secondary"></i> VLESS
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='socks') }}">
+                            <i class="fas fa-socks mr-2 text-success"></i> SOCKS
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='trojan') }}">
+                            <i class="fas fa-user-secret mr-2 text-danger"></i> TROJAN
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='hysteria2') }}">
+                            <i class="fas fa-wind mr-2 text-purple"></i> HYSTERIA2
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='shadowsocks') }}">
+                            <i class="fas fa-mask mr-2 text-dark"></i> SHADOWSOCKS
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('create_node', protocol='subscribe') }}">
+                            <i class="fas fa-rss mr-2 text-orange"></i> 订阅添加
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='proxy_devices') }}">
+                            <i class="fas fa-file-export mr-2 text-success"></i> 导出 EXCEL
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='proxy_devices') }}">
+                            <i class="fas fa-file-import mr-2 text-info"></i> 导入 EXCEL
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('database', type='proxy') }}">
+                            <i class="fas fa-trash-alt mr-2 text-danger"></i> 清空代理
+                        </a>
                     </div>
                 </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
 
+                <!-- 中转连接 -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="forwardMenu" role="button"
                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="fa fa-envelope-o">
-                            <span class="badge badge-success" role="button">SERVER</span>
-                        </i>
-                        主机列表&nbsp;&nbsp;
+                        <i class="fas fa-random mr-1 text-warning"></i> 中转连接
                     </a>
-                    <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('host') }}">主机清单</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('host_create') }}">主机创建</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('batch_create_proxies') }}">主机搭建</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('batch_get_proxies') }}">代理提取</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='host') }}">导出EXCEL</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='host') }}">导入EXCEL</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('database',type='host') }}">清空主机</a>
-                        <div class="dropdown-divider"></div>
+                    <div class="dropdown-menu" aria-labelledby="forwardMenu">
+                        <a class="dropdown-item" href="{{ url_for('relay_connections',type='look') }}">
+                            <i class="fas fa-list mr-2 text-primary"></i> 中转清单
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('relay_connections',type='add') }}">
+                            <i class="fas fa-plus-circle mr-2 text-success"></i> SOCAT中转
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('relay_on_off',type='on') }}">
+                            <i class="fas fa-play-circle mr-2 text-success"></i> 启动中转
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('test_all_ports') }}">
+                            <i class="fas fa-vial mr-2 text-info"></i> 测试中转
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('relay_on_off',type='off') }}">
+                            <i class="fas fa-stop-circle mr-2 text-warning"></i> 禁用中转
+                        </a>
+                        <a class="dropdown-item"
+                           href="{{ url_for('export_excel_route', table_name='relay_connections') }}">
+                            <i class="fas fa-file-export mr-2 text-success"></i> 导出 EXCEL
+                        </a>
+                        <a class="dropdown-item"
+                           href="{{ url_for('import_excel_route', table_name='relay_connections') }}">
+                            <i class="fas fa-file-import mr-2 text-info"></i> 导入 EXCEL
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('database',type='forward') }}">
+                            <i class="fas fa-trash-alt mr-2 text-danger"></i> 清空中转
+                        </a>
                     </div>
-
                 </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
 
+                <!-- 协议转换 -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="conversionMenu" role="button"
                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="fa fa-envelope-o">
-                            <span class="badge badge-success" role="button">LOG</span>
-                        </i>
-                        日志信息&nbsp;&nbsp;
+                        <i class="fas fa-exchange-alt mr-1 text-info"></i> 协议转换
                     </a>
-                    <div class="dropdown-menu" aria-labelledby="navbarDropdown2">
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('logs', log_type='xos_log') }}"
-                           target="_blank">Xos操作日志</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('logs', log_type='xray_log') }}" target="_blank">Xray信息日志</a>
-                        <div class="dropdown-divider"></div>
+                    <div class="dropdown-menu" aria-labelledby="conversionMenu">
+                        <a class="dropdown-item" href="{{ url_for('conversion') }}">
+                            <i class="fas fa-list mr-2 text-primary"></i> 转换清单
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('conversion_create', type='crate') }}">
+                            <i class="fas fa-plus-circle mr-2 text-success"></i> 添加转换
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('conversion_select') }}">
+                            <i class="fas fa-magic mr-2 text-warning"></i> 提取代理
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('conversion_enable') }}">
+                            <i class="fas fa-play-circle mr-2 text-success"></i> 启动转换
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('conversion_disable') }}">
+                            <i class="fas fa-stop-circle mr-2 text-danger"></i> 禁用转换
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='conversion') }}">
+                            <i class="fas fa-file-export mr-2 text-success"></i> 导出 EXCEL
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='conversion') }}">
+                            <i class="fas fa-file-import mr-2 text-info"></i> 导入 EXCEL
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('database', type='conversion') }}">
+                            <i class="fas fa-trash-alt mr-2 text-danger"></i> 清空转换
+                        </a>
+                    </div>
+                </li>
+
+
+                <!-- 主机列表 -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="hostMenu" role="button"
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-desktop mr-1 text-light"></i> 主机列表
+                    </a>
+                    <div class="dropdown-menu" aria-labelledby="hostMenu">
+                        <a class="dropdown-item" href="{{ url_for('host') }}">
+                            <i class="fas fa-server mr-2 text-primary"></i> 主机清单
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('host_create') }}">
+                            <i class="fas fa-plus-circle mr-2 text-success"></i> 主机创建
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('batch_create_proxies') }}">
+                            <i class="fas fa-cogs mr-2 text-info"></i> 主机搭建
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('batch_get_proxies') }}">
+                            <i class="fas fa-download mr-2 text-warning"></i> 代理提取
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('export_excel_route', table_name='host') }}">
+                            <i class="fas fa-file-export mr-2 text-success"></i> 导出 EXCEL
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='host') }}">
+                            <i class="fas fa-file-import mr-2 text-info"></i> 导入 EXCEL
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('database', type='host') }}">
+                            <i class="fas fa-trash-alt mr-2 text-danger"></i> 清空主机
+                        </a>
+                    </div>
+                </li>
+
+
+                <!-- 日志 -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="logMenu" role="button"
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-file-alt mr-1 text-secondary"></i> 日志信息
+                    </a>
+                    <div class="dropdown-menu" aria-labelledby="logMenu">
+                        <a class="dropdown-item" href="{{ url_for('logs', log_type='xos_log') }}" target="_blank">
+                            <i class="fas fa-terminal mr-2 text-info"></i> XOS 操作日志
+                        </a>
+                        <a class="dropdown-item" href="{{ url_for('logs', log_type='xray_log') }}" target="_blank">
+                            <i class="fas fa-stream mr-2 text-success"></i> Xray 信息日志
+                        </a>
                         <a class="dropdown-item" href="{{ url_for('logs', log_type='xray_error_log') }}"
-                           target="_blank">Xray报错日志</a>
-                        <div class="dropdown-divider"></div>
-
-                    </div>
-
-                </li>
-            </ul>
-            <ul class="navbar-nav ml-auto">
-                <li style="color: white; list-style-type: none; display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end;">
-                    <div class="badge badge-success" role="button" style="margin-right: 10px; margin-bottom: 5px;">
-                        <span>CPU:</span><span id="cpuPercentage">0%</span><br>
-
-                        <span>MEM:</span> <span id="memoryPercentage">0%</span>
-                    </div>
-                </li>
-                <li style="color: white; list-style-type: none; display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end;">
-                    <div class="badge badge-success" role="button" style="margin-right: 10px; margin-bottom: 5px;">
-            <span>
-                上传:</span> <span id="uploadSpeed">0 Mbps</span>
-                        <br>
-                        <span>
-                下载:</span> <span id="downloadSpeed">0 Mbps</span>
+                           target="_blank">
+                            <i class="fas fa-exclamation-triangle mr-2 text-danger"></i> Xray 错误日志
+                        </a>
                     </div>
                 </li>
             </ul>
 
+            <!-- 右侧系统状态 + 用户 -->
+            <ul class="navbar-nav ms-auto align-items-center">
 
-            <ul class="navbar-nav">
+                <!-- 系统状态 -->
+                <li class="nav-item text-light me-3 text-center small">
+                    <div>
+                        <i class="fas fa-microchip me-1 text-info" title="CPU 使用率"></i>CPU: <span id="cpuPercentage">0%</span><br>
+                        <i class="fas fa-memory me-1 text-warning" title="内存使用率"></i>MEM: <span
+                            id="memoryPercentage">0%</span>
+                    </div>
+                </li>
+
+                <li class="nav-item text-light me-3 text-center small">
+                    <div>
+                        <i class="fas fa-upload me-1 text-success" title="上传速度"></i>上传: <span id="uploadSpeed">0 Mbps</span><br>
+                        <i class="fas fa-download me-1 text-primary" title="下载速度"></i>下载: <span
+                            id="downloadSpeed">0 Mbps</span>
+                    </div>
+                </li>
+
+                <!-- 用户信息 -->
                 {% if user %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard') }}">
-                            <i class="fa fa-user">
-                                <span class="badge badge-info">在线用户</span>
-                            </i>
-                            {{ user.username }}
+                        <a class="nav-link text-light" href="{{ url_for('dashboard') }}" title="查看仪表盘">
+                            <i class="fas fa-user-circle me-2 text-light"></i>{{ user.username }}
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('change_password') }}">
-                            <i class="fa fa-cogs">
-                                <span class="badge badge-info">修改密码</span>
-                                Password
-                            </i>
+                        <a class="nav-link text-warning" href="{{ url_for('change_password') }}" title="修改密码">
+                            <i class="fas fa-key me-2"></i>修改密码
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('logout') }}">
-                            <i class="fa fa-sign-out">
-                                <span class="badge badge-danger">退出登录</span>
-                            </i>
-                            Logout
+                        <a class="nav-link text-danger" href="{{ url_for('logout') }}" title="退出登录">
+                            <i class="fas fa-sign-out-alt me-2"></i>退出
                         </a>
                     </li>
                 {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('login') }}">
-                            <i class="fa fa-bell">
-                                <span class="badge badge-primary">登录</span>
-                            </i>
-                            Login
+                        <a class="nav-link text-success" href="{{ url_for('login') }}" title="登录账户">
+                            <i class="fas fa-sign-in-alt me-2"></i>登录
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('register') }}">
-                            <i class="fa fa-globe">
-                                <span class="badge badge-primary">注册</span>
-                            </i>
-                            Register
+                        <a class="nav-link text-info" href="{{ url_for('register') }}" title="注册新用户">
+                            <i class="fas fa-user-plus me-2"></i>注册
                         </a>
                     </li>
                 {% endif %}
-
             </ul>
         </div>
     </nav>
 
-    <!-- 在页面底部添加 SocketIO 代码 -->
+    <!-- SocketIO 实时数据监听 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script>
         var socket = io.connect('http://' + document.domain + ':' + location.port);
-
         socket.on('update_realtime_data', function (data) {
-            // 转换上传和下载速度为 Mbps
             var uploadSpeedMbps = data.upload > 0 ? (data.upload * 8 / 1024 / 1024).toFixed(2) : 0;
             var downloadSpeedMbps = data.download > 0 ? (data.download * 8 / 1024 / 1024).toFixed(2) : 0;
 
-            // 更新页面上的实时数据
             document.getElementById('cpuPercentage').innerText = data.cpu.toFixed(1) + '%';
             document.getElementById('memoryPercentage').innerText = data.memory.toFixed(1) + '%';
             document.getElementById('uploadSpeed').innerText = uploadSpeedMbps + ' Mbps';

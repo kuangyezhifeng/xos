@@ -10,7 +10,7 @@ from exts.conversion import *
 from exts.excel import *
 from exts.socks import alone_socks_config, alone_proxy_url, alone_running_socks, alone_noauth_socks_config
 import pandas as pd
-from sqlalchemy import desc
+from sqlalchemy import case
 from app import create_app
 import psutil
 import threading
@@ -183,23 +183,41 @@ def logout():
 @app.route('/', methods=['GET'])
 @login_required
 def dashboard():
-    # 使用 current_user 获取当前登录的用户
-    user = current_user
     page = request.args.get('page', 1, type=int)
 
-    # 修改查询以按照指定顺序排序
-    proxies = ProxyDevice.query.order_by(ProxyDevice.gateway.desc(), ProxyDevice.status).paginate(page=page, per_page=PER_PAGE)
+    # 按 gateway 降序，status 优先 Active
+    status_order = case(
+        (ProxyDevice.status == 'Active', 1),
+        (ProxyDevice.status == 'Inactive', 2),
+        else_=3
+    )
+    proxies = ProxyDevice.query.order_by(
+        ProxyDevice.gateway.desc(),
+        status_order
+    ).paginate(page=page, per_page=PER_PAGE)
 
-    return render_template('dashboard.html', user=user, proxies=proxies)
+    user = current_user  # 加这一行，获取当前登录用户
 
-
+    return render_template('dashboard.html', proxies=proxies, user=user)  # 把 user 传给模板
+# @app.route('/logs/<log_type>')
+# @login_required
+# def logs(log_type):
+#     # 读取日志文件的内容
+#     log_content = read_log(log_type)
+#
+#     # 渲染模板并传递日志内容
+#     return render_template('logs.html', log_content=log_content, log_type=log_type)
 @app.route('/logs/<log_type>')
 @login_required
 def logs(log_type):
     # 读取日志文件的内容
     log_content = read_log(log_type)
 
-    # 渲染模板并传递日志内容
+    # 如果是 Ajax 请求，返回纯文本日志内容
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return log_content, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+
+    # 否则渲染页面
     return render_template('logs.html', log_content=log_content, log_type=log_type)
 
 
@@ -215,7 +233,7 @@ def system():
     exec_type = request.args.get('exec_type')
     # Mapping of exec_types to functions
     exec_type_functions = {
-        'tproxy': (create_fwmark_rule_and_local_route, reset_transparent_proxy_config),
+        'xos': (restart_xos_service,),
         'xray': (
             reset_xray_config,
             lambda: logging.info("Xray服务已经运行!") if is_xray_enabled() else reset_xray_services()),
@@ -494,7 +512,7 @@ def node_delete():
         for id in selected_items:
             proxies = db.session.get(ProxyDevice, id)
             xray_node_delete_handler(proxies)
-            logging.info(f'已删除代理:{proxies.access_ip} 路由:{proxies.tag}')
+            logging.info(f'✅已删除代理:{proxies.access_ip} 路由:{proxies.tag}')
 
     return redirect(url_for('dashboard'))
 
@@ -609,7 +627,7 @@ def relay_on_off():
         exec_type = request.args.get('type')
 
         if relay_id:
-            relay_connection = RelayConnection.query.get(relay_id)
+            relay_connection = db.session.get(RelayConnection, relay_id)
             if relay_connection:
                 process_single_relay(relay_connection, exec_type)
         else:
@@ -676,24 +694,48 @@ relay_ip_select 路由处理函数用于处理 /relay_ip_select 路由的 GET �
 最后，重定向到 dashboard 路由。
 """
 
-
-@app.route('/relay_ip_select', methods=['GET', 'POST'])
+@app.route('/proxy_chain', methods=['GET', 'POST'])
 @login_required
-def relay_ip_select():
-    if request.method == 'GET':
-        tag = request.args.get('tag')
-        target_ips_with_selection = relay_ip_route_config(tag)
+def proxy_chain():
+    # 处理 GET 请求逻辑
+    tag = request.args.get('tag')
+    id = request.args.get('id', type=int)
+    if request.method == 'POST':
+        selected_value = request.form.get('selected_target_ip')  # 格式 "ip|tag" 或 None
+        id = request.args.get('id', type=int)
+        device = db.session.get(ProxyDevice, id)
 
-        # 将结果传递给模板
-        return render_template('relay_ip_select.html', user=current_user, target_ips=target_ips_with_selection, tag=tag)
 
-    # 在POST请求处理部分
-    elif request.method == 'POST':
-        tag = request.form['tag']
-        selected_target_ips = set(request.form.getlist('selected_target_ip'))
-        relay_ip_route_set(tag, selected_target_ips)
+        if selected_value:
+            selected_ip, selected_tag = selected_value.split('|')
+            device.proxy_chain = selected_tag
+            set_proxy_chain(get_tag=tag, post_tag=selected_tag)
 
+        else:
+            # 只有id，没有选中，清空字段
+            device.proxy_chain = None
+            clear_proxy_chain(tag)
+
+        db.session.commit()
+        # 处理完后，跳转回GET页面，传选中ip的tag和id
         return redirect(url_for('dashboard', user=current_user))
+
+    # 查询符合条件的数据
+    devices = ProxyDevice.query.with_entities(ProxyDevice.node_ip, ProxyDevice.tag) \
+        .filter(ProxyDevice.status == 'Active') \
+        .filter((ProxyDevice.proxy_chain == None) | (ProxyDevice.proxy_chain == '')) \
+        .filter(ProxyDevice.access_ip != '127.0.0.1') \
+        .all()
+    # 构造模板需要的结构 (node_ip, tag, selected)
+    target_ips = [(node_ip, dev_tag, False) for node_ip, dev_tag in devices]
+
+    return render_template('proxy_chain.html',
+                           user=current_user,
+                           target_ips=target_ips,
+                           tag=tag,
+                           id=id)
+
+
 
 
 """
@@ -917,14 +959,14 @@ def conversion_delete():
         if conver:
             db.session.delete(conver)
             db.session.commit()
-            logging.info(f'删除协议转换:{conver.inbound_connections} 路由:{conver.outbound_connections}')
+            logging.info(f'✅删除协议转换:{conver.inbound_connections} 路由:{conver.outbound_connections}')
 
     else:
         selected_items = request.form.getlist('selected_items[]')
         for id in selected_items:
             conver = Conver.query.get(id)
             db.session.delete(conver)
-            logging.info(f'删除协议转换:{conver.inbound_connections} 路由:{conver.outbound_connections}')
+            logging.info(f'✅删除协议转换:{conver.inbound_connections} 路由:{conver.outbound_connections}')
             db.session.commit()
 
     return redirect(url_for('conversion'))
@@ -1289,7 +1331,7 @@ def single_create_proxies():
             # 更新数据库字段
             proxies.protocol = protocol
             proxies.proxy_url = f"socks://{ip}:{port}:{account}:{password}"
-            logging.info(f"成功创建新的代理:{proxies.proxy_url}")
+            logging.info(f"✅成功创建新的代理:{proxies.proxy_url}")
             db.session.commit()
 
         # 创建VMESS代理
@@ -1297,7 +1339,7 @@ def single_create_proxies():
             vmess_link = generate_vmess_link(protocol, ip, port)
             proxies.protocol = 'vmess'
             proxies.proxy_url = vmess_link
-            logging.info(f"成功创建新的代理:{proxies.proxy_url}")
+            logging.info(f"✅成功创建新的代理:{proxies.proxy_url}")
             db.session.commit()
 
         # 创建hysteria2代理
@@ -1309,7 +1351,7 @@ def single_create_proxies():
             password = generate_random_password()
             proxies.protocol = 'hysteria2'
             proxies.proxy_url = f"hysteria2://{password}@{main_ip}:{port}?sni=bing.com&insecure=1#hyster2"
-            logging.info(f"成功创建新的代理:{proxies.proxy_url}")
+            logging.info(f"✅成功创建新的代理:{proxies.proxy_url}")
             db.session.commit()
             # 部署服务
             deploy_hysteria2(main_ip, account, password, port)

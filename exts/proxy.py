@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse, unquote
 from base64 import urlsafe_b64decode
 from threading import Thread
 from app.models import *
+from collections import OrderedDict
 import subprocess
 import re
 import base64
@@ -17,8 +18,16 @@ import ipaddress
 import logging
 import socket
 
-# Configure logging
-logging.basicConfig(filename='/var/log/xos.txt', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# 配置你的操作日志
+logging.basicConfig(
+    filename='/var/log/xos.txt',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+# 屏蔽 Flask 的 HTTP 访问日志
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
+logging.getLogger('werkzeug').propagate = False
 
 # xray配置文件路径
 CONFIG_PATH = '/usr/local/xos/xray/config.json'
@@ -51,7 +60,7 @@ def update_handler():
 
         # 使用 rsync 命令备份源目录到备份目录，并替换目标目录中的文件
         subprocess.run(["rsync", "-av", "--delete", "/usr/local/xos/", backup_dir_path])
-        logging.info(f"xos 备份成功，路径: {backup_dir_path}")
+        logging.info(f"✅xos 备份成功，路径: {backup_dir_path}")
 
         subprocess.run(["rm", "-rf", "/tmp/xos"])
         # 克隆仓库到本地
@@ -168,6 +177,38 @@ def reset_transparent_proxy_config():
     # 添加xray用户安装hysteria2程序
     xray_useradd()
 
+def restart_xos_service():
+    """
+    重启 xos 面板服务
+    返回一个 dict，包含执行状态和信息
+    """
+    try:
+        # 运行系统命令重启服务
+        result = subprocess.run(
+            ['systemctl', 'restart', 'xos.service'],
+            check=True,  # 出错时抛异常
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        return {
+            'success': True,
+            'message': '服务已成功重启',
+            'stdout': result.stdout,
+            'stderr': result.stderr
+        }
+    except subprocess.CalledProcessError as e:
+        return {
+            'success': False,
+            'message': f'重启服务失败，错误码: {e.returncode}',
+            'stdout': e.stdout,
+            'stderr': e.stderr
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f'执行命令时发生异常: {str(e)}'
+        }
 
 def restore_system_state():
     socat_count = db.session.query(RelayConnection).filter_by(status='1').count()
@@ -206,12 +247,12 @@ def xray_useradd():
     # 检查用户是否存在
     try:
         subprocess.check_output(['id', xray_username], stderr=subprocess.STDOUT)
-        logging.info(f"用户 '{xray_username}' 已存在。")
+        logging.info(f"✅用户 '{xray_username}' 已存在。")
     except subprocess.CalledProcessError:
         # 如果用户不存在，则创建用户
         subprocess.run(['useradd', '-m', '-s', '/bin/bash', xray_username])
         # 改变目录所有权
-        logging.info(f"用户 '{xray_username}' 创建成功。")
+        logging.info(f"✅用户 '{xray_username}' 创建成功。")
 
     # 获取用户的 uid
     uid_output = subprocess.check_output(['id', '-u', xray_username]).decode().strip()
@@ -222,7 +263,7 @@ def xray_useradd():
 
     try:
         subprocess.run(iptables_rule, shell=True, check=True)
-        logging.info(f"为用户 '{xray_username}' (UID: {user_uid}) 添加 iptables 规则成功。")
+        logging.info(f"✅为用户 '{xray_username}' (UID: {user_uid}) 添加 iptables 规则成功。")
     except subprocess.CalledProcessError as e:
         logging.error(f"添加 iptables 规则时发生错误: {e}")
 
@@ -934,7 +975,7 @@ def uninstall_hysteria2_service(tag):
     subprocess.run(["sudo", "rm", f"/etc/hysteria2/{tag}.json"])
     # 重新加载 Systemd
     subprocess.run(["sudo", "systemctl", "daemon-reload"])
-    logging.info(f"已卸载hysteria2服务: {tag}")
+    logging.info(f"✅已卸载hysteria2服务: {tag}")
 
     return True
 
@@ -1334,7 +1375,7 @@ def node_domain_set(xray_config, decode_data):
             ip_address = ip_match.group(1)
             # 强制替换主机名对应的 IP 地址列表
             xray_config['dns']['hosts'][hostname] = ip_address
-            logging.info(f"成功将域名 {hostname} 解析为 IP 地址: {ip_address}")
+            logging.info(f"✅成功将域名 {hostname} 解析为 IP 地址: {ip_address}")
         else:
             logging.error(f"无法从 ping 输出中提取 IP 地址: {output}")
 
@@ -1359,9 +1400,9 @@ def node_domain_unset(hostname, xray_config):
     if hostname in xray_config['dns']['hosts']:
         # 删除键
         deleted_ip_addresses = xray_config['dns']['hosts'].pop(hostname)
-        logging.info(f"移除节点DNS {hostname} 对应的 IP 地址: {deleted_ip_addresses}")
+        logging.info(f"✅移除节点DNS {hostname} 对应的 IP 地址: {deleted_ip_addresses}")
     else:
-        logging.info(f"{hostname} 不存在于文件中，无需删除")
+        logging.info(f"✅{hostname} 不存在于文件中，无需删除")
 
 
 """
@@ -1459,12 +1500,12 @@ def save_xray_config(xray_config, config_path):
             # 如果文件路径是指定的路径，直接写入预定义的字符串
             with open(config_path, 'w', encoding='utf-8') as file:
                 file.write(xray_config)
-                logging.info(f"写入系统服务 {config_path} 成功")
+                logging.info(f"✅写入系统服务 {config_path} 成功")
         else:
             # 否则，使用 JSON 格式保存配置
             with open(config_path, 'w', encoding='utf-8') as file:
                 json.dump(xray_config, file, indent=4, ensure_ascii=False)
-                logging.info(f"写入 {config_path} 配置成功")
+                logging.info(f"✅写入 {config_path} 配置成功")
 
         return True
 
@@ -1522,11 +1563,11 @@ def restart_xray_service(service_name):
         # 执行重启Xray服务的命令
         gateway_route_set()
         subprocess.run(['systemctl', 'restart', service_name])
-        logging.info(f"{service_name}服务重启成功")
+        logging.info(f"✅{service_name}服务重启成功")
 
     else:
         subprocess.run(['systemctl', 'restart', service_name])
-        logging.info(f"{service_name}服务重启成功")
+        logging.info(f"✅{service_name}服务重启成功")
 
 
 """
@@ -1653,7 +1694,7 @@ def node_info_savedb(proxy_url, protocol, access_ip, note=''):
 
     try:
         db.session.commit()
-        logging.info(f"成功保存{protocol}节点到数据库")
+        logging.info(f"✅成功保存{protocol}节点到数据库")
     except Exception as e:
         db.session.rollback()
         logging.error(f"保存{protocol}节点到数据库时出错: {str(e)}")
@@ -2083,7 +2124,7 @@ def xray_node_outbound_add(proxy_url, outbound_tag, config_path=CONFIG_PATH):
             node_domain_set(xray_config, decode_data)
             # 保存配置
             save_xray_config(xray_config, config_path)
-            logging.info(f"已添加出站节点到配置文件，tag: {outbound_tag}")
+            logging.info(f"✅已添加出站节点到配置文件，tag: {outbound_tag}")
             return 1
         else:
             logging.warning(INVALID_URL_MESSAGE)
@@ -2197,7 +2238,7 @@ def xray_node_route_add(xray_config, decode_data, protocol):
                           (access_ip in rule.get("ip", []) and int(port) == int(rule.get("port", 0)))), None)
 
     if access_ip == "127.0.0.1":
-        logging.info(f"跳过 127.0.0.1 的路由规则: {access_ip}:{port}")
+        logging.info(f"✅跳过 127.0.0.1 的路由规则: {access_ip}:{port}")
     else:
         if not existing_rule:
             # 判断 access_ip 是域名还是IP地址
@@ -2260,7 +2301,7 @@ def xray_node_outbound_remove(tag, hostname='', config_path=CONFIG_PATH):
 
     # 保存更新后的配置
     if save_xray_config(xray_config, config_path):
-        logging.info(f"已成功移除节点outboundTag配置，tag: {tag}")
+        logging.info(f"✅已成功移除节点outboundTag配置，tag: {tag}")
         return 1
     else:
         return "Xray Error"
@@ -2341,7 +2382,7 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
         logging.error(f"端口转换失败：{port}")
         return
 
-    logging.info(f"[ROUTE REMOVE] 协议: {protocol}, IP: {access_ip}, PORT: {port}")
+    logging.info(f"✅[ROUTE REMOVE] 协议: {protocol}, IP: {access_ip}, PORT: {port}")
 
     # 读取 Xray 配置
     xray_config = load_xray_config(config_path)
@@ -2374,10 +2415,10 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
         if ip_matched and port_matched:
             rule['ip'] = [ip for ip in rule_ips if ip != access_ip]
             if not rule['ip']:
-                logging.info(f"已清除规则: {rule}")
+                logging.info(f"✅已清除规则: {rule}")
                 continue  # 整个规则 IP 为空时不保留
             else:
-                logging.info(f"更新规则，移除 IP：{access_ip}")
+                logging.info(f"✅更新规则，移除 IP：{access_ip}")
                 new_rules.append(rule)
         else:
             new_rules.append(rule)
@@ -2387,7 +2428,7 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
 
     # 保存配置
     if save_xray_config(xray_config, config_path):
-        logging.info(f"✅ 成功移除节点出站规则: {protocol}://{access_ip}:{port}")
+        logging.info(f"✅✅ 成功移除节点出站规则: {protocol}://{access_ip}:{port}")
     else:
         logging.error("❌ Xray 配置保存失败")
 
@@ -2524,13 +2565,13 @@ def xray_route_rule(route_dict, match_type, config_path=CONFIG_PATH):
         ):
             # 更新规则
             existing_rule.update(route_dict)
-            logging.info(f"更新源为：{existing_rule.get(match_type)}，出站标签为：{outbound_tag} 的规则")
+            logging.info(f"✅更新源为：{existing_rule.get(match_type)}，出站标签为：{outbound_tag} 的规则")
             break
     else:
         # 如果不存在则添加新的路由规则
         routing_rules = xray_config.setdefault('routing', {}).setdefault('rules', [])
         routing_rules.insert(-2, route_dict)
-        logging.info(f"添加新规则，源为：{route_dict.get(match_type)}，出站标签为：{outbound_tag}。操作成功。")
+        logging.info(f"✅添加新规则，源为：{route_dict.get(match_type)}，出站标签为：{outbound_tag}。操作成功。")
 
     # 复制现有规则以进行安全迭代
     for existing_rule in existing_rules.copy():
@@ -2541,7 +2582,7 @@ def xray_route_rule(route_dict, match_type, config_path=CONFIG_PATH):
                 # 如果 match_type 对应的值为空了，则移除整个规则
                 if not existing_rule.get(match_type):
                     existing_rules.remove(existing_rule)
-                logging.info(f"已移除源为：{address}，出站标签为：{outbound_tag} 的规则")
+                logging.info(f"✅已移除源为：{address}，出站标签为：{outbound_tag} 的规则")
 
     # 保存更新后的配置
     if save_xray_config(xray_config, config_path):
@@ -2580,7 +2621,7 @@ def xray_route_remove(tag, match_type, config_path=CONFIG_PATH):
 
     # 保存更新后的配置
     if save_xray_config(xray_config, config_path):
-        logging.info(f"已移除出站节点关联设备ROUTE规则，tag: {tag}, 条件: {match_type}")
+        logging.info(f"✅已移除出站节点关联设备ROUTE规则，tag: {tag}, 条件: {match_type}")
     else:
         logging.error("Xray 错误")
         return "Xray Error"
@@ -2639,7 +2680,7 @@ def xray_device_route_handler(proxys, raw_text):
     if route_dict:
         xray_route_rule(route_dict, "source")
 
-        logging.info(f"添加设备路由规则成功：{device_ip}-出站路由：{tag}")
+        logging.info(f"✅添加设备路由规则成功：{device_ip}-出站路由：{tag}")
     else:
         logging.error(f"添加设备路由规则失败：{device_ip}-出站路由：{tag}")
 
@@ -2668,7 +2709,7 @@ def excel_import_device_route_handler():
         route_dict = generate_device_route(device_ip, tag)
         if route_dict:
             xray_route_rule(route_dict, "source")
-            logging.info(f"EXCEL导入设备关联代理成功：{device_ip}-出站路由：{tag}")
+            logging.info(f"✅EXCEL导入设备关联代理成功：{device_ip}-出站路由：{tag}")
         else:
             logging.error(f"EXCEL导入设备关联代理失败：{device_ip}-出站路由：{tag}")
 
@@ -2742,7 +2783,7 @@ def generate_test_config(protocol, proxy_url, tag, port):
         else:
             outbound = generate_node_outbound(decode_data, tag, protocol)
 
-        logging.info(f"生成的 Outbound 配置: {outbound}")
+        logging.info(f"✅生成的 Outbound 配置: {outbound}")
     else:
         logging.error("无法生成 Outbound 配置.")
 
@@ -2784,13 +2825,13 @@ def port_test(proxies_id, port):
 
     if test1_result[0] == 0:
         test_result[proxies_id] = test1_result[1]
-        logging.info(f"代理ID{proxies_id} INFOIO测试结果: {test1_result[1]}")
+        logging.info(f"✅代理ID{proxies_id} INFOIO测试结果: {test1_result[1]}")
     elif test2_result[0] == 0:
         test_result[proxies_id] = test2_result[1]
-        logging.info(f"代理ID{proxies_id} IP-API测试结果: {test2_result[1]}")
+        logging.info(f"✅代理ID{proxies_id} IP-API测试结果: {test2_result[1]}")
     elif test3_result[0] == 0:
         test_result[proxies_id] = test3_result[1]
-        logging.info(f"代理ID{proxies_id}IFCONFIG.ME测试结果: {test3_result[1]}")
+        logging.info(f"✅代理ID{proxies_id}IFCONFIG.ME测试结果: {test3_result[1]}")
     else:
         test_result[proxies_id] = "Inactive"
 
@@ -3017,7 +3058,7 @@ def relay_info_savedb(validated_rules):
 
                 db.session.add(new_connection)
                 db.session.commit()
-                logging.info(f"成功保存中转规则到数据库: {rule_info}")
+                logging.info(f"✅成功保存中转规则到数据库: {rule_info}")
             except Exception as e:
                 db.session.rollback()
                 logging.error(f"保存中转规则到数据库时出错: {str(e)}")
@@ -3092,12 +3133,12 @@ def socat_process_kill(relay_connection):
         # 杀死匹配的 socat 进程
         try:
             subprocess.run(f"kill {process_pid}", shell=True)
-            logging.info(f"成功杀死 socat 进程，进程 ID： {process_pid}")
+            logging.info(f"✅成功杀死 socat 进程，进程 ID： {process_pid}")
 
         except subprocess.CalledProcessError:
-            logging.info(f"进程 {process_pid} 不存在，无需杀死")
+            logging.info(f"✅进程 {process_pid} 不存在，无需杀死")
     else:
-        logging.info(f"无法获取 socat 进程的 PID，无法杀死进程")
+        logging.info(f"✅无法获取 socat 进程的 PID，无法杀死进程")
 
 
 """
@@ -3141,46 +3182,12 @@ def relay_connection_on(relay_connection):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(1)
             s.connect((target_ip, target_port))
-        logging.info(f"成功启动 socat 进程，中转规则： {socat_command}")
+        logging.info(f"✅成功启动 socat 进程，中转规则： {socat_command}")
     except subprocess.CalledProcessError:
         logging.error(f"启动 socat 进程失败，中转规则： {socat_command}")
     except (socket.error, socket.timeout):
         logging.error(f"端口未打开，中转规则： {socat_command}")
 
-
-'''
-
-relay_ip_route_config 函数
-功能描述：
-
-relay_ip_route_config 函数用于生成中继连接的 IP 路由配置信息。函数接受一个参数：
-
-tag: 中继连接的标签。
-操作步骤：
-
-如果提供了 tag 参数，则使用 SQLAlchemy 查询语句获取所有 outbound 字段为空或等于指定标签值的目标 IP。
-如果未提供 tag 参数，则使用 SQLAlchemy 查询语句获取所有目标 IP。
-对于每个目标 IP，创建一个元组，其中包含 IP 地址和一个布尔值，表示是否已经选中（True 表示已选中，False 表示未选中）。
-返回包含目标 IP 和选中状态的列表。
-返回值：
-
-返回一个列表，其中每个元素是一个包含目标 IP 和选中状态的元组。
-
-注意： 该函数主要用于在前端页面中显示中继连接的 IP 列表，并标记哪些 IP 已经选中。在前端页面中，可以使用这些信息来显示复选框或其他 UI 元素，以便用户可以选择要更新的 IP 路由规则。
-'''
-
-
-def relay_ip_route_config(tag):
-    # 查询特定标签的目标IP，并包括标签为空的记录
-    selected_target_ips = set(ip for ip, in RelayConnection.query.filter(
-        (RelayConnection.tag == tag) | (RelayConnection.tag == None)).with_entities(
-        RelayConnection.target_ip).all())
-
-    # 返回查询出来的结果，满足要求的格式
-    target_ips_with_selection = [(ip, True if ip in selected_target_ips and tag else False) for ip, tag in RelayConnection.query.with_entities(
-        RelayConnection.target_ip, RelayConnection.tag).distinct().all()]
-
-    return target_ips_with_selection
 
 
 """
@@ -3228,3 +3235,65 @@ def relay_ip_route_set(tag, selected_target_ips):
         # 如果 ip_string 不存在，则清除 IP 地址路由出站规则
         xray_route_remove(tag, "ip")
         return None
+
+
+def set_proxy_chain(get_tag, post_tag):
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except Exception as e:
+        logging.error(f"配置读取失败: {e}")
+        return
+
+    found = False
+    for i, outbound in enumerate(config.get("outbounds", [])):
+        if outbound.get("tag") == get_tag:
+            new_outbound = OrderedDict()
+            for k, v in outbound.items():
+                if k != "proxySettings":
+                    new_outbound[k] = v
+            new_outbound["proxySettings"] = {
+                "tag": post_tag
+            }
+            config["outbounds"][i] = new_outbound
+            found = True
+            break
+
+    if not found:
+        logging.warning(f"未找到 tag 为 {get_tag} 的 outbound")
+        return
+
+    try:
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4)
+        logging.info(f"✅成功设置 proxySettings: {get_tag} -> {post_tag}")
+    except Exception as e:
+        logging.error(f"配置写入失败: {e}")
+
+
+def clear_proxy_chain(tag):
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except Exception as e:
+        logging.error(f"配置读取失败: {e}")
+        return
+
+    found = False
+    for outbound in config.get("outbounds", []):
+        if outbound.get("tag") == tag:
+            if "proxySettings" in outbound:
+                del outbound["proxySettings"]
+                found = True
+            break
+
+    if not found:
+        logging.warning(f"未找到 tag 为 {tag} 的 outbound，或未设置 proxySettings")
+        return
+
+    try:
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4)
+        logging.info(f"✅成功移除 {tag} 的 proxySettings")
+    except Exception as e:
+        logging.error(f"配置写入失败: {e}")

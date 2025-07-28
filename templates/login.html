@@ -1,68 +1,104 @@
 <script type="text/javascript" src="/static/js/jquery.slim.min.js"></script>
 <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
 <script src="/static/js/bootstrap.min.js"></script>
-<body style="background:url(static/images/wildlee.svg) no-repeat center; background-position: center 0; background-size: cover; margin: 0px;">
+
+<body style="background:url(/static/images/wildlee.svg) no-repeat center top; background-size: cover; margin: 0;">
 <style>
-    .signin-container {
-        background: rgba(255, 255, 255, 0.2);
-        width: 480px;
-        margin: 0 auto;
-        margin-top: 15%;
-        padding: 42px 42px 39px;
-        display: flex; /* 添加这一行，将容器设置为弹性盒子 */
-        flex-direction: column; /* 设置主轴方向为垂直，让子元素垂直居中 */
-        align-items: center; /* 在主轴上居中子元素 */
+    body {
+        font-family: 'Segoe UI', 'FZLanTingHei', sans-serif;
     }
 
-    .button-container {
-        display: flex;
-        justify-content: space-between;
+.signin-container {
+    background: rgba(232, 86, 41, 0.35);  /* 橘红色 + 更强透明度 */
+    backdrop-filter: blur(10px);
+    max-width: 460px;
+    margin: 10% auto;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+    color: white;
+    background: linear-gradient(
+  rgba(232, 86, 41, 0.3),
+  rgba(232, 86, 41, 0.4)
+);
+}
+    .signin-container label {
+        font-weight: bold;
+    }
+
+    .form-control {
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 16px;
+        border: none;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn {
+        border-radius: 8px;
+        font-weight: bold;
+        background-color: #ffffff;
+        color: #e85629;
+        border: none;
+        transition: 0.2s ease;
+    }
+
+    .btn:hover {
+        background-color: #e85629;
+        color: white;
+    }
+
+    .form-row {
+        margin-top: 20px;
+    }
+
+    .alert {
+        margin-top: 20px;
+        border-radius: 6px;
+        padding: 10px 15px;
+        text-align: center;
+    }
+
+    /* 响应式优化 */
+    @media (max-width: 480px) {
+        .signin-container {
+            margin: 5%;
+            padding: 30px;
+        }
     }
 </style>
+
 {% block content %}
-    <div class="signin-container" style="background-color: #e85629; opacity: 0.9; padding: 30px; border-radius: 10px">
-        <div id="signin-container">
+    <div class="signin-container">
+        <form method="post" action="{{ url_for('login') }}">
+            <input type="hidden" name="next" value="{{ next_page }}">
 
-            <form class="form-horizontal" method="post" action="{{ url_for('login') }}" style="color: white; font-family: 'FZLanTingHei', sans-serif;">
-                <input type="hidden" name="next" value="{{ next_page }}">
+            <div class="form-group">
+                <label for="inputUsername">用户</label>
+                <input type="text" class="form-control" id="inputUsername" placeholder="username" name="username">
+            </div>
 
-                <div class="form-group row">
-                    <label for="inputUsername" class="col-sm-4 control-label">用户</label>
-                    <div class="col-sm-12">
-                        <input type="text" class="form-control" id="inputUsername" placeholder="username"
-                               name="username">
-                    </div>
-                </div>
-                <div class="form-group row">
-                    <label for="inputPassword" class="col-sm-4 control-label">密码</label>
-                    <div class="col-sm-12">
-                        <input type="password" class="form-control" id="inputPassword" placeholder="password"
-                               name="password">
-                    </div>
-                </div>
+            <div class="form-group">
+                <label for="inputPassword">密码</label>
+                <input type="password" class="form-control" id="inputPassword" placeholder="password" name="password">
+            </div>
 
-                <div class="form-row mt-4">
-                    <div class="col-sm-6">
-                        <button type="submit" class="btn btn-block">登录</button>
-                    </div>
-                    <!-- 注册按钮 -->
-                    <div class="col-sm-6">
-                        <button type="button" onclick="window.location='{{ url_for('register') }}'"
-                                class="btn btn-block">注册
-                        </button>
-                    </div>
+            <div class="form-row">
+                <div class="col-sm-6 mb-2 mb-sm-0">
+                    <button type="submit" class="btn btn-block">登录</button>
                 </div>
+                <div class="col-sm-6">
+                    <button type="button" onclick="window.location='{{ url_for('register') }}'" class="btn btn-block">注册</button>
+                </div>
+            </div>
 
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
-                    <div class="alert alert-{{ messages[0].lower() }}">
-                        {{ messages[1] }}
+                    <div class="alert alert-warning">
+                        {{ messages[0] }}
                     </div>
                 {% endif %}
             {% endwith %}
-            </form>
-
-        </div>
+        </form>
     </div>
-
 {% endblock %}

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+
 {% block styles %}
     {{ super() }}
 
@@ -76,42 +77,38 @@
 
 {% block content %}
     <div class="signin-container">
-        <form class="form-horizontal" method="post" action="{{ url_for('gateway_select') }}">
-            <div class="row">
-                <div class="col-sm-12">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="select-all">
-                        <label class="form-check-label" for="select-all">
-                            全选
-                        </label>
-                    </div>
-                </div>
-                {% for item in target_ips %}
-                    <div class="col-sm-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="selected_target_ip"
-                                   value="{{ item['ip'] }}-{{ item['tag'] }}"
-                                   id="{{ item['ip'] }}" {% if item['selected'] %}checked{% endif %}>
-                            <label class="form-check-label" for="{{ item['ip'] }}">
-                                {{ item['ip'] }} - {{ item['tag'] }}
-                            </label>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
+        <form class="form-horizontal" method="post" action="{{ url_for('proxy_chain', tag=tag, id=id) }}">
+           <div class="row">
+           <input type="hidden" name="id" value="{{ id }}">  <!-- 新增这一行 -->
+    <!-- “无代理链”选项 -->
+    <div class="col-sm-3">
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="selected_target_ip" value="" id="none" {% if not tag %}checked{% endif %}>
+            <label class="form-check-label" for="none">
+                <i class="fas fa-times-circle"></i> OFF
+            </label>
+        </div>
+    </div>
 
-            <div class="button-container mt-4">
-                <button type="submit" class="btn col-sm-4">设置网关</button>
-                <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn col-sm-4">返回</button>
+    {% for node_ip, tag_value, selected in target_ips %}
+        <div class="col-sm-3">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="selected_target_ip" value="{{ node_ip }}|{{ tag_value }}" id="{{ node_ip }}" {% if selected %}checked{% endif %}>
+                <label class="form-check-label" for="{{ node_ip }}">
+                    <i class="fas fa-network-wired"></i>
+                    {{ node_ip }} <small>({{ tag_value }})</small>
+                </label>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+            <input type="hidden" name="tag" value="{{ tag }}">
+            <input type="hidden" name="id" value="{{ id }}">
+
+            <div class="button-container">
+                <button type="submit" class="btn">链式代理</button>
+                <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn">返回</button>
             </div>
         </form>
     </div>
-
-    <script>
-        // 使用箭头函数修复 "this" 上下文问题
-        document.getElementById('select-all').addEventListener('change', (e) => {
-            const checkboxes = document.querySelectorAll('input[type="checkbox"][name="selected_target_ip"]');
-            checkboxes.forEach(cb => cb.checked = e.target.checked);
-        });
-    </script>
 {% endblock %}

@@ -42,6 +42,9 @@ class ProxyDevice(db.Model):
     flag = db.Column(db.Integer)
     note = db.Column(db.String(length=255))
     gateway = db.Column(db.Integer)
+    proxy_chain = db.Column(db.String(length=50))
+    note = db.Column(db.String(length=255))
+
     # note = db.Column(db.String(length=255,collation='utf8mb4_bin'))
 
 
@@ -54,7 +57,6 @@ class RelayConnection(db.Model):
     target_ip = db.Column(db.String(length=15), nullable=False)
     target_port = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(length=15))
-    tag = db.Column(db.String(length=15))
     note = db.Column(db.Text)
 
 
