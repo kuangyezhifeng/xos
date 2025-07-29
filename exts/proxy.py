@@ -661,7 +661,7 @@ def reset_xray_config():
     # Xray Config
     xray_config_content = {
         "log": {
-            "loglevel": "debug",
+            "loglevel": "warning",
             "error": "/var/log/xray/error.log",
             "access": "/var/log/xray/access.log"
         },
@@ -672,6 +672,7 @@ def reset_xray_config():
                 "protocol": "dokodemo-door",
                 "settings": {
                     "network": "tcp,udp",
+                    "udpIdleTimeout": 600,
                     "followRedirect": True
                 },
                 "sniffing": {
@@ -680,7 +681,8 @@ def reset_xray_config():
                 },
                 "streamSettings": {
                     "sockopt": {
-                        "tproxy": "tproxy"
+                        "tproxy": "tproxy",
+                        "udpFragment": True
                     }
                 }
             }
