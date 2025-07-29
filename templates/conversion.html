@@ -1,149 +1,266 @@
 {% extends 'base.html' %}
+{% block styles %}
+    {{ super() }}
 
+    <style>
+        /* 毛玻璃 + 白底半透明背景 */
+        .custom-table {
+            border-collapse: collapse !important;
+            background: rgba(255, 255, 255, 0.7); /* 白色半透明 */
+            backdrop-filter: blur(12px);
+            border-radius: 14px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            width: 100%;
+            color: #222; /* 黑色文字 */
+        }
+
+        /* 单元格样式 */
+        .custom-table tbody td {
+            border-bottom: 1.5px solid rgba(0, 0, 0, 0.1);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 0.5rem 0.75rem;
+            vertical-align: middle !important;
+            color: #222; /* 黑字 */
+        }
+
+        /* 去掉最后一列的右边框 */
+        .custom-table tr th:last-child,
+        .custom-table tr td:last-child {
+            border-right: none !important;
+        }
+
+        /* badge 圆点数字，保持橙红渐变 */
+        .badge-number {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 8px;
+            background: linear-gradient(135deg, rgb(46, 44, 47), #2e2c2f);
+            color: #05e105;
+            box-shadow: 0 0 6px rgba(119, 119, 111, 0.5);
+        }
+
+        /* 按钮基础样式 */
+        .btn {
+            min-width: 30px;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover:not(.disabled) {
+            background-color: rgba(119, 119, 111, 0.5);
+            border-color: rgba(119, 119, 111, 0.5);
+            color: rgba(255, 255, 255, 0.42);
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, rgba(119, 119, 111, 0.5), rgba(119, 119, 111, 0.5));
+            border: none;
+            color: #08a808;
+            font-weight: 700;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(90deg, rgba(119, 119, 111, 0.5), rgba(119, 119, 111, 0.5));
+        }
+
+        .ml-2 {
+            margin-left: 0.5rem !important;
+        }
+
+        .no-border {
+            border: none !important;
+        }
+
+    </style>
+{% endblock %}
 {% block content %}
     <form method="post">
-        <table class="table table-hover" style="width: 100%;">
+        <table class="table table-hover custom-table">
+            <thead>
             <tr class="bg-dark">
-                <td class="text-white">编号</td>
-                <td class="text-white">代理IP</td>
-                <td class="text-white">真实IP</td>
-                <td class="text-white">国家</td>
-                <td class="text-white">城市</td>
-                <td class="text-white">入站协议</td>
-                <td style="color: white; width:10%;">入站连接</td>
-                <td class="text-white">出站协议</td>
-                <td style="color: white; width:10%;">出站连接</td>
-                <td class="text-white">路由</td>
-                <td class="text-white">状态</td>
-                <td style="color: white; width:3%;">修改</td>
-                <td style="color: white; width:3%;">启用</td>
-                <td style="color: white; width:3%;">修改</td>
-                <td style="color: white; width:3%;">删除</td>
-                <td style="color: white; width:4%;">
-                    <input type="checkbox" id="select-all"> 全选
-                </td>
+                <th class="text-white">
+                    <i class="fas fa-hashtag" style="font-size: 1.1em; vertical-align: middle; margin-right: 6px;"></i>编号
+                </th>
+                <th class="text-white"><i class="fas fa-network-wired me-1"></i>代理IP</th>
+                <th class="text-white"><i class="fas fa-globe me-1"></i>真实IP</th>
+                <th class="text-white"><i class="fas fa-flag me-1"></i>国家</th>
+                <th class="text-white"><i class="fas fa-city me-1"></i>城市</th>
+                <th class="text-white"><i class="fas fa-sign-in-alt me-1"></i>入站协议</th>
+                <th class="text-white" style="width:10%;"><i class="fas fa-plug me-1"></i>入站连接</th>
+                <th class="text-white"><i class="fas fa-sign-out-alt me-1"></i>出站协议</th>
+                <th class="text-white" style="width:10%;"><i class="fas fa-plug me-1"></i>出站连接</th>
+                <th class="text-white"><i class="fas fa-route me-1"></i>路由</th>
+                <th class="text-white"><i class="fas fa-info-circle me-1"></i>状态</th>
+                <th class="text-white" style="width:4%;"><i class="fas fa-edit me-1"></i>修改</th>
+                <th class="text-white" style="width:4%;"><i class="fas fa-toggle-on me-1"></i>启用</th>
+                <th class="text-white" style="width:4%;"><i class="fas fa-sync-alt me-1"></i>解析</th>
+                <th class="text-white" style="width:4%;"><i class="fas fa-trash-alt me-1"></i>删除</th>
+                <th class="text-white" style="width:3%;">
+                    <i class="fas fa-check-square me-1"></i><input type="checkbox" id="select-all">
+                </th>
             </tr>
-            <!-- 将传上来的 proxies 进行遍历，输出 HTML 标签 -->
+            </thead>
+            <tbody>
             {% for proxy in proxies.items %}
                 <tr>
-                    <td><span class="badge">{{ loop.index }}</span></td>
+                    <td><span class="badge bg-secondary">{{ loop.index }}</span></td>
                     <td>{{ proxy.proxy_ip }}</td>
                     <td>{{ proxy.real_ip }}</td>
                     <td>{{ proxy.country }}</td>
                     <td>{{ proxy.city }}</td>
                     <td>{{ proxy.inbound_protocol }}</td>
-                    <td class="shorten-text" data-full-text="{{ proxy.inbound_connections }}"
-                        onclick="copyText(this)">{{ proxy.inbound_connections }}</td>
+                    <td class="shorten-text" data-full-text="{{ proxy.inbound_connections }}" onclick="copyText(this)"
+                        style="cursor:pointer;">{{ proxy.inbound_connections }}</td>
                     <td>{{ proxy.outbound_protocol }}</td>
-                    <td class="shorten-text" data-full-text="{{ proxy.outbound_connections }}"
-                        onclick="copyText(this)">{{ proxy.outbound_connections }}</td>
+                    <td class="shorten-text" data-full-text="{{ proxy.outbound_connections }}" onclick="copyText(this)"
+                        style="cursor:pointer;">{{ proxy.outbound_connections }}</td>
                     <td>{{ proxy.tag }}</td>
-                    <td>{{ proxy.status }}</td>
-                                   <td>
-                        <a class="btn btn-success" href="{{ url_for('conversion_update', id=proxy.id) }}">修改</a>
+                    <td>
+                        {% if proxy.status == 'online' %}
+                            <span class="text-success" title="在线"><i class="fas fa-check-circle me-1"></i>在线</span>
+                        {% else %}
+                            <span class="text-muted" title="离线"><i class="fas fa-times-circle me-1"></i>离线</span>
+                        {% endif %}
                     </td>
 
                     <td>
+                        <a class="btn btn-sm btn-primary" href="{{ url_for('conversion_update', id=proxy.id) }}"
+                           title="修改">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </td>
+                    <td>
                         {% if proxy.flag == 1 %}
-                            <a class="btn btn-success" href="{{ url_for('conversion_on_off', id=proxy.id) }}">启用</a>
+                            <a class="btn btn-sm btn-success" href="{{ url_for('conversion_on_off', id=proxy.id) }}"
+                               title="启用">
+                                <i class="fas fa-toggle-on"></i>
+                            </a>
                         {% else %}
-                            <a class="btn btn-warning" href="{{ url_for('conversion_on_off', id=proxy.id) }}">禁用</a>
+                            <a class="btn btn-sm btn-secondary" href="{{ url_for('conversion_on_off', id=proxy.id) }}"
+                               title="禁用">
+                                <i class="fas fa-toggle-off"></i>
+                            </a>
                         {% endif %}
                     </td>
                     <td>
-                        <a class="btn btn-success" href="{{ url_for('conversion_check', id=proxy.id) }}">解析</a>
+                        <a class="btn btn-sm btn-info" href="{{ url_for('conversion_check', id=proxy.id) }}"
+                           title="解析">
+                            <i class="fas fa-sync-alt"></i>
+                        </a>
                     </td>
                     <td>
-                            <a class="btn btn-success" href="{{ url_for('conversion_delete', id=proxy.id) }}">删除</a>
+                        <a class="btn btn-sm btn-danger" href="{{ url_for('conversion_delete', id=proxy.id) }}"
+                           title="删除" onclick="return confirm('确认删除吗？');">
+                            <i class="fas fa-trash-alt"></i>
+                        </a>
                     </td>
+
                     <td>
                         <input type="checkbox" name="selected_items[]" value="{{ proxy.id }}">
                     </td>
                 </tr>
             {% endfor %}
+            </tbody>
+            <tfoot>
+            <tr>
+                <td colspan="16" class="p-0">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap bg-dark text-white p-3 rounded-bottom shadow">
 
-            <tr class="bg-dark">
-                <!-- 分页导航 -->
-                <td colspan="13">
-                    <span class="badge badge-secondary mr-2">第 {{ proxies.page }} 页</span>
-                    {% if proxies.has_prev %}
-                        <a class="btn btn-secondary ml-2"
-                           href="{{ url_for('conversion', page=proxies.prev_num) }}">上一页</a>
-                    {% else %}
-                        <a class="btn btn-secondary ml-2 disabled" href="#">上一页</a>
-                    {% endif %}
+                        <!-- 分页栏：居中对齐 -->
+                        <div class="flex-grow-1 text-center mb-2 mb-sm-0">
+                            <span class="badge bg-secondary">第 {{ proxies.page }} 页</span>
 
-                    {% for num in proxies.iter_pages() %}
-                        {% if num %}
-                            {% if num != proxies.page %}
-                                <a class="btn btn-secondary ml-2"
-                                   href="{{ url_for('conversion', page=num) }}">{{ num }}</a>
+                            {% if proxies.has_prev %}
+                                <a class="btn btn-sm btn-secondary ms-2"
+                                   href="{{ url_for('conversion', page=proxies.prev_num) }}">
+                                    <i class="fas fa-chevron-left me-1"></i>上一页
+                                </a>
                             {% else %}
-                                <span class="btn btn-primary ml-2">{{ num }}</span>
+                                <span class="btn btn-sm btn-secondary disabled ms-2">
+                            <i class="fas fa-chevron-left me-1"></i>上一页
+                        </span>
                             {% endif %}
-                        {% else %}
-                            <span class="btn btn-secondary ml-2 disabled">...</span>
-                        {% endif %}
-                    {% endfor %}
 
-                    {% if proxies.has_next %}
-                        <a class="btn btn-secondary ml-2"
-                           href="{{ url_for('dashboard', page=proxies.next_num) }}">下一页</a>
-                    {% else %}
-                        <a class="btn btn-secondary ml-2 disabled" href="#">下一页</a>
-                    {% endif %}
-                </td>
-             <td style="color: white;">
-                    <button type="submit" class="btn btn-success" formaction="{{ url_for('conversion_on_off') }}">开关
-                    </button>
-                </td>
-                <td style="color: white;">
-                    <button type="submit" class="btn btn-success" formaction="{{ url_for('conversion_check') }}">解析
-                    </button>
-                </td>
-                <td style="color: white;">
-                    <button type="submit" class="btn btn-success" formaction="{{ url_for('conversion_delete') }}">删除
-                    </button>
+                            {% for num in proxies.iter_pages() %}
+                                {% if num %}
+                                    {% if num == proxies.page %}
+                                        <span class="btn btn-sm btn-primary ms-2">{{ num }}</span>
+                                    {% else %}
+                                        <a class="btn btn-sm btn-secondary ms-2"
+                                           href="{{ url_for('conversion', page=num) }}">{{ num }}</a>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="btn btn-sm btn-secondary disabled ms-2">...</span>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if proxies.has_next %}
+                                <a class="btn btn-sm btn-secondary ms-2"
+                                   href="{{ url_for('conversion', page=proxies.next_num) }}">
+                                    下一页 <i class="fas fa-chevron-right ms-1"></i>
+                                </a>
+                            {% else %}
+                                <span class="btn btn-sm btn-secondary disabled ms-2">
+                            下一页 <i class="fas fa-chevron-right ms-1"></i>
+                        </span>
+                            {% endif %}
+                        </div>
+
+                        <div class="text-end d-flex justify-content-end align-items-center" style="gap: 20px;">
+                            <button type="submit" class="btn btn-success btn-sm"
+                                    formaction="{{ url_for('conversion_on_off') }}">
+                                <i class="fas fa-toggle-on me-1"></i>开关
+                            </button>
+                            <button type="submit" class="btn btn-info btn-sm"
+                                    formaction="{{ url_for('conversion_check') }}">
+                                <i class="fas fa-sync-alt me-1"></i>解析
+                            </button>
+                            <button type="submit" class="btn btn-danger btn-sm"
+                                    formaction="{{ url_for('conversion_delete') }}"
+                                    onclick="return confirm('确认删除选中项吗？');">
+                                <i class="fas fa-trash-alt me-1"></i>删除
+                            </button>
+                        </div>
+
+                    </div>
                 </td>
             </tr>
+            </tfoot>
+
+
         </table>
     </form>
+
     <script>
         function copyText(element) {
-            // 创建临时的文本输入框
             var tempInput = document.createElement("input");
             tempInput.value = element.getAttribute("data-full-text");
             document.body.appendChild(tempInput);
-
-            // 选择并复制文本
             tempInput.select();
             document.execCommand("copy");
-
-            // 移除临时输入框
             document.body.removeChild(tempInput);
-
-            // 可以添加一些用户反馈，例如提示复制成功
             alert("已复制到剪贴板：" + tempInput.value);
         }
 
         document.addEventListener("DOMContentLoaded", function () {
-            var tdElements = document.querySelectorAll(".shorten-text");
-
-            tdElements.forEach(function (tdElement) {
-                var originalText = tdElement.textContent;
-                var truncatedText = originalText.substring(0, 50); // 调整字符范围
-                tdElement.textContent = truncatedText;
-                tdElement.title = originalText; // 将原始文本设置为标题
+            document.querySelectorAll(".shorten-text").forEach(function (td) {
+                let full = td.textContent;
+                if (full.length > 50) {
+                    td.textContent = full.slice(0, 50) + '...';
+                    td.title = full;
+                }
             });
         });
 
-
-        // JavaScript代码，用于处理全选/取消全选逻辑
         document.getElementById('select-all').addEventListener('change', function () {
-            var checkboxes = document.getElementsByName('selected_items[]');
-            for (var i = 0; i < checkboxes.length; i++) {
-                checkboxes[i].checked = this.checked;
-            }
+            document.querySelectorAll("input[name='selected_items[]']").forEach(cb => cb.checked = this.checked);
         });
     </script>
 {% endblock %}
