@@ -857,7 +857,7 @@ def conversion_on_off():
     # 根据ID查询主IP信息
     if request.method == 'GET':
         id = request.args.get('id')
-        proxy = Conver.query.get(id)
+        proxy = db.session.get(Conver, id)
         conversion_config(proxy)
 
     else:
