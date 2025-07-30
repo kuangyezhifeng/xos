@@ -180,35 +180,34 @@ def reset_transparent_proxy_config():
 def restart_xos_service():
     """
     重启 xos 面板服务
-    返回一个 dict，包含执行状态和信息
+    返回包含状态、输出和带图标的消息（使用 ✅❌）
     """
-    try:
-        # 运行系统命令重启服务
-        result = subprocess.run(
-            ['systemctl', 'restart', 'xos.service'],
-            check=True,  # 出错时抛异常
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        return {
-            'success': True,
-            'message': '服务已成功重启',
-            'stdout': result.stdout,
-            'stderr': result.stderr
-        }
-    except subprocess.CalledProcessError as e:
-        return {
-            'success': False,
-            'message': f'重启服务失败，错误码: {e.returncode}',
-            'stdout': e.stdout,
-            'stderr': e.stderr
-        }
-    except Exception as e:
-        return {
-            'success': False,
-            'message': f'执行命令时发生异常: {str(e)}'
-        }
+    result = subprocess.run(
+        ['systemctl', 'restart', 'xos.service'],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+
+    success = result.returncode == 0
+
+    if success:
+        message = '✅ xos.service 重启成功'
+        logging.info(message)
+    else:
+        message = f'❌ xos.service 重启失败，错误码: {result.returncode}'
+        logging.error(message)
+        if result.stderr.strip():
+            logging.error(f'stderr: {result.stderr.strip()}')
+        if result.stdout.strip():
+            logging.info(f'stdout: {result.stdout.strip()}')
+
+    return {
+        'success': success,
+        'message': message,
+        'stdout': result.stdout.strip(),
+        'stderr': result.stderr.strip()
+    }
 
 def restore_system_state():
     socat_count = db.session.query(RelayConnection).filter_by(status='1').count()
