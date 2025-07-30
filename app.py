@@ -199,22 +199,24 @@ def dashboard():
     user = current_user  # 加这一行，获取当前登录用户
 
     return render_template('dashboard.html', proxies=proxies, user=user)  # 把 user 传给模板
-# @app.route('/logs/<log_type>')
-# @login_required
-# def logs(log_type):
-#     # 读取日志文件的内容
-#     log_content = read_log(log_type)
-#
-#     # 渲染模板并传递日志内容
-#     return render_template('logs.html', log_content=log_content, log_type=log_type)
+
 @app.route('/logs/<log_type>')
 @login_required
 def logs(log_type):
-    # 读取日志文件的内容
-    log_content = read_log(log_type)
+    # 如果是 Ajax 请求，客户端应带 offset（已读到哪）
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        offset = request.args.get('offset', type=int)
+        if offset is not None:
+            log_content, new_offset = read_log(log_type, from_offset=offset)
+            return jsonify({
+                'content': log_content,
+                'offset': new_offset
+            })
 
-    # 渲染静态页面（不再区分 Ajax）
-    return render_template('logs.html', log_content=log_content, log_type=log_type)
+    # 否则是普通页面加载，读取最后30行
+    log_content, current_offset = read_log(log_type, lines=30)
+    return render_template('logs.html', log_content=log_content, log_type=log_type, offset=current_offset)
+
 
 @app.route('/error')
 @login_required

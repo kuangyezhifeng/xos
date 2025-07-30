@@ -1,11 +1,13 @@
 {% block styles %}
 <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+<script src="/static/js/bootstrap.min.js"></script>
 <style>
     html, body {
         margin: 0; padding: 0; height: 100%;
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         background-color: #121212;
         color: #e0e0e0;
+        user-select: text;
     }
     .log-container {
         background: #1e1e1e;
@@ -44,6 +46,7 @@
         overflow-y: auto;
         box-shadow: inset 0 0 8px #000000aa;
         line-height: 1.4;
+        user-select: text;
     }
     .log-content::-webkit-scrollbar {
         width: 8px;
@@ -62,8 +65,31 @@
 {% block content %}
 <div class="log-container">
     <h2><i class="fas fa-file-alt"></i>{{ log_type | capitalize }} 日志内容</h2>
-    <div class="log-content" id="logContent" spellcheck="false">
+    <div class="log-content" id="logContent" spellcheck="false" contenteditable="false">
         {{ log_content | e }}
     </div>
 </div>
+
+<script>
+    const logContent = document.getElementById('logContent');
+    let offset = {{ offset | default(0) }};
+    const baseUrl = window.location.pathname;
+
+    setInterval(() => {
+        fetch(`${baseUrl}?offset=${offset}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.content) {
+                const span = document.createElement('span');
+                span.textContent = data.content;
+                logContent.appendChild(span);
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+            offset = data.offset;  // 更新最新偏移
+        })
+        .catch(e => console.error('获取日志失败:', e));
+    }, 3000);
+</script>
 {% endblock %}
