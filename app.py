@@ -213,13 +213,8 @@ def logs(log_type):
     # 读取日志文件的内容
     log_content = read_log(log_type)
 
-    # 如果是 Ajax 请求，返回纯文本日志内容
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return log_content, 200, {'Content-Type': 'text/plain; charset=utf-8'}
-
-    # 否则渲染页面
+    # 渲染静态页面（不再区分 Ajax）
     return render_template('logs.html', log_content=log_content, log_type=log_type)
-
 
 @app.route('/error')
 @login_required

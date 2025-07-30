@@ -3164,31 +3164,44 @@ relay_connection_on 函数用于启动中继连接规则。该函数接收一个
 
 
 def relay_connection_on(relay_connection):
-    # 获取中转规则信息
     source_port = relay_connection.source_port
     target_ip = relay_connection.target_ip
     target_port = relay_connection.target_port
-    protocol = relay_connection.protocol.lower()  # 将协议字段转换为小写
+    protocol = relay_connection.protocol.lower()
 
-    # 根据协议动态构造 socat 启动命令
-    socat_command = f'socat -d TCP4-LISTEN:{source_port},reuseaddr,fork TCP4:{target_ip}:{target_port} 2>/dev/null &'
     if protocol == 'udp':
-        socat_command = (f'socat -T 30 -d UDP4-LISTEN:{source_port},reuseaddr,fork UDP4:{target_ip}:{target_port} '
-                         f'2>/dev/null &')
+        cmd = [
+            'socat',
+            '-T', '30',
+            '-d',
+            f'UDP4-LISTEN:{source_port},reuseaddr,fork',
+            f'UDP4:{target_ip}:{target_port}'
+        ]
+    else:
+        cmd = [
+            'socat',
+            '-d',
+            f'TCP4-LISTEN:{source_port},reuseaddr,fork',
+            f'TCP4:{target_ip}:{target_port}'
+        ]
+
     try:
-        # 启动 socat 进程，设置子进程的进程组为新的会话
-        subprocess.Popen(socat_command, shell=True, preexec_fn=os.setsid)
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, preexec_fn=os.setsid)
 
-        # 检查端口是否打开
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(1)
-            s.connect((target_ip, target_port))
-        logging.info(f"✅成功启动 socat 进程，中转规则： {socat_command}")
+        if protocol == 'udp':
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.settimeout(1)
+                s.sendto(b'', (target_ip, target_port))
+        else:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1)
+                s.connect((target_ip, target_port))
+
+        logging.info(f"✅ 成功启动 socat 进程，中转规则：{' '.join(cmd)}")
     except subprocess.CalledProcessError:
-        logging.error(f"启动 socat 进程失败，中转规则： {socat_command}")
-    except (socket.error, socket.timeout):
-        logging.error(f"端口未打开，中转规则： {socat_command}")
-
+        logging.error(f"❌ 启动 socat 进程失败，中转规则：{' '.join(cmd)}")
+    except (socket.error, socket.timeout) as e:
+        logging.error(f"❌ 端口未打开，中转规则：{' '.join(cmd)}，错误：{e}")
 
 
 """
