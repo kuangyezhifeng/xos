@@ -1481,9 +1481,8 @@ def configure():
 
 
 if __name__ == '__main__':
-    # app.run(port=80, host="0.0.0.0")
-    # 启动获取系统数据的线程
-    data_thread = threading.Thread(target=get_system_data)
+    # 后台线程获取系统数据
+    data_thread = threading.Thread(target=get_system_data, daemon=True)
     data_thread.start()
     # # 恢复运行的中转和路由规则
     # restore_system_state()
