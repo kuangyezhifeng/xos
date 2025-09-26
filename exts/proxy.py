@@ -620,13 +620,13 @@ def gateway_route_set():
             "strategy": {
                 "type": "roundRobin"
             },
-            "fallbackTag": "direct"
+            "fallbackTag": "blocked"
         }
         # 添加 observatory
         xray_config["observatory"] = {
             "subjectSelector": replaced_tags,
-            "probeUrl": "https://www.google.com/generate_204",
-            "probeInterval": "10s",
+            "probeUrl": "http://connect.rom.miui.com/generate_204",
+            "probeInterval": "100s",
             "enableConcurrency": True
         }
         # 添加新的 "balancers" 到列表中
