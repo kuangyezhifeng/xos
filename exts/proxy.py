@@ -558,7 +558,7 @@ def gateway_route_savedb(selected_target_ips):
 
     # 将所有选中的 access_ip 对应的记录的 gateway 字段设置为 1
     for combined_ip_tag in selected_target_ips:
-        ip, tag = combined_ip_tag.split('-')
+        ip, tag = combined_ip_tag.split('|')
         ProxyDevice.query.filter_by(access_ip=ip, tag=tag).update(
             {"gateway": 1},
             synchronize_session=False
@@ -620,13 +620,13 @@ def gateway_route_set():
             "strategy": {
                 "type": "roundRobin"
             },
-            "fallbackTag": "direct"
+            "fallbackTag": "blocked"
         }
         # 添加 observatory
         xray_config["observatory"] = {
             "subjectSelector": replaced_tags,
-            "probeUrl": "https://www.google.com/generate_204",
-            "probeInterval": "10s",
+            "probeUrl": "http://connect.rom.miui.com/generate_204",
+            "probeInterval": "100s",
             "enableConcurrency": True
         }
         # 添加新的 "balancers" 到列表中
