@@ -568,83 +568,93 @@ def gateway_route_savedb(selected_target_ips):
 
 
 def gateway_route_set():
-    # 使用 load_xray_config 函数加载 xray_config
+    # 加载 xray 配置
     xray_config = load_xray_config(config_path=CONFIG_PATH)
-    # 添加网关路由
-    gateway_rule = {
-        "type": "field",
-        "balancerTag": "balancer",
-        "port": "0-65535"
-    }
     rules_list = xray_config["routing"].get("rules", [])
+    gateway_rule = {"type": "field", "balancerTag": "balancer", "port": "0-65535"}
 
-    # 获取选中的 access_ip 对应的 tag 值
+    # 查询选中的 gateway tags
     tags = ProxyDevice.query.filter_by(gateway=1).with_entities(ProxyDevice.tag).all()
+    replaced_tags = [tag for tag, in tags] if tags else []
 
-    # 无论 tags 是否为空，先清除旧的 balancers 配置 ✅
-    xray_config["routing"]["balancers"] = []
+    # 获取健康检查开关状态
+    config_db = Xos_config.query.first()
+    enable_health_check = getattr(config_db, "gateway_health_check", True)
 
+    # ============================
+    # 处理 balancers
+    # ============================
+    existing_balancers = xray_config["routing"].get("balancers", [])
 
-    # 如果 tags 为空，移除已存在的 "balancers" 和 "rules"
-    if not tags:
-        xray_config.pop("observatory", None)
+    # 删除已有默认网关 balancer 的 fallbackTag
+    for b in existing_balancers:
+        if b.get("tag") == "balancer" and "fallbackTag" in b:
+            del b["fallbackTag"]
 
-        # 移除默认网关路由规则
-        if gateway_rule in rules_list:
-            rules_list.remove(gateway_rule)
-
-        # 移除DNS代理设置
-        for outbound in xray_config.get("outbounds", []):
-            if outbound.get("tag") == "dns-out":
-                if "proxySettings" in outbound:
-                    del outbound["proxySettings"]
-
+    # 如果有 tags，更新或新增默认网关 balancer
+    if replaced_tags:
+        balancer = next((b for b in existing_balancers if b.get("tag") == "balancer"), None)
+        if balancer:
+            balancer.update({
+                "selector": replaced_tags,
+                "strategy": {"type": "roundRobin"},
+            })
+            if enable_health_check:
+                balancer["fallbackTag"] = "blocked"
         else:
-            logging.info("tags 为空，但指定规则不在列表中")
-
-        logging.info("默认网关取消, 清理 balancers 和 rules  dns proxy 成功")
-        save_xray_config(xray_config, config_path=CONFIG_PATH)
-
+            balancer = {
+                "tag": "balancer",
+                "selector": replaced_tags,
+                "strategy": {"type": "roundRobin"},
+            }
+            if enable_health_check:
+                balancer["fallbackTag"] = "blocked"
+            existing_balancers.append(balancer)
+    # 如果没有 tags，移除默认网关 balancer
     else:
-        # 将数据库中查询到的 tags 直接替换为新的标签值
-        replaced_tags = [tag for tag, in tags]
+        existing_balancers = [b for b in existing_balancers if b.get("tag") != "balancer"]
 
-        # 如果 tags 为空，移除已存在的 "balancers" 和 "rules"
-        if not tags:
-            xray_config["routing"].pop("balancers", None)
-            xray_config.pop("observatory", None)
+    xray_config["routing"]["balancers"] = existing_balancers
 
-        balancer = {
-            "tag": "balancer",
-            "selector": replaced_tags,
-            "strategy": {
-                "type": "roundRobin"
-            },
-            "fallbackTag": "blocked"
-        }
-        # 添加 observatory
+    # ============================
+    # 处理 observatory
+    # ============================
+    if enable_health_check and replaced_tags:
         xray_config["observatory"] = {
             "subjectSelector": replaced_tags,
             "probeUrl": "http://connect.rom.miui.com/generate_204",
             "probeInterval": "100s",
             "enableConcurrency": True
         }
-        # 添加新的 "balancers" 到列表中
-        xray_config["routing"].setdefault("balancers", []).append(balancer)
+    else:
+        xray_config.pop("observatory", None)
 
-        xray_config["routing"].setdefault("rules", []).append(gateway_rule) if gateway_rule not in rules_list else None
+    # ============================
+    # 处理默认网关规则
+    # ============================
+    if replaced_tags and gateway_rule not in rules_list:
+        rules_list.append(gateway_rule)
+    elif not replaced_tags and gateway_rule in rules_list:
+        rules_list.remove(gateway_rule)
+    xray_config["routing"]["rules"] = rules_list
 
-        # 当默认网关不为空的时候,给DNS添加代理设置
+    # ============================
+    # DNS 代理设置
+    # ============================
+    if replaced_tags:
         for outbound in xray_config.get("outbounds", []):
             if outbound.get("tag") == "dns-out":
-                if "proxySettings" in outbound:
-                    outbound["proxySettings"].update({"tag": replaced_tags[0]})
-                else:
-                    outbound["proxySettings"] = {"tag": replaced_tags[0]}
+                outbound["proxySettings"] = {"tag": replaced_tags[0]}
+    else:
+        for outbound in xray_config.get("outbounds", []):
+            if outbound.get("tag") == "dns-out" and "proxySettings" in outbound:
+                del outbound["proxySettings"]
 
-        save_xray_config(xray_config, config_path=CONFIG_PATH)
-
-        logging.info("设置代理网关成功")
+    # ============================
+    # 保存配置
+    # ============================
+    save_xray_config(xray_config, config_path=CONFIG_PATH)
+    logging.info("设置代理网关成功，健康检查状态：%s", enable_health_check)
 
 
 def reset_xray_config():

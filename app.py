@@ -251,28 +251,27 @@ def system():
 @login_required
 def database():
     type_class = request.args.get('type')
-    if type_class  == "all":
+    if type_class == "all":
         db.session.query(ProxyDevice).delete()
         db.session.query(RelayConnection).delete()
         db.session.query(Conver).delete()
         db.session.commit()
-
-    elif type_class  == "proxy":
+    elif type_class == "proxy":
         db.session.query(ProxyDevice).delete()
         db.session.commit()
         return redirect(url_for('dashboard', user=current_user))
 
-    elif type_class  == "forward":
+    elif type_class == "forward":
         db.session.query(RelayConnection).delete()
         db.session.commit()
         return redirect(url_for('relay_connections', user=current_user))
 
-    elif type_class  == "conversion":
+    elif type_class == "conversion":
         db.session.query(Conver).delete()
         db.session.commit()
         return redirect(url_for('conversion', user=current_user))
 
-    elif type_class  == "host":
+    elif type_class == "host":
         db.session.query(Host).delete()
         db.session.query(Host_Config).delete()
         db.session.commit()
@@ -306,13 +305,15 @@ def xos_config():
             db.session.add(default_config)
             db.session.commit()
             config = default_config
-        return render_template('xos_set.html', user=current_user,config=config)
+
+        return render_template('xos_set.html', user=current_user, config=config)
 
     elif request.method == 'POST':
         # 获取代理模式的选择值
         proxy_mode = request.form.get('proxy_mode')
         if proxy_mode:
             switch_proxy_mode(proxy_mode)
+
         # 获取代理分享的选择值
         proxy_share = request.form.get('proxy_share')
         if proxy_share:
@@ -323,10 +324,24 @@ def xos_config():
         if page_rows:
             set_page_number(page_rows)
 
+        # ===========================
+        # 新增功能：网关健康检测
+        # ===========================
+        health_check = request.form.get('gateway_health_check')
+        if health_check:
+            config = Xos_config.query.first()
+            if not config:
+                config = Xos_config()
+                db.session.add(config)
+            # 将前端选择写入数据库
+            config.gateway_health_check = (health_check == 'enable')
+            db.session.commit()
+
         return redirect(url_for('dashboard', user=current_user))
 
-"""
 
+
+"""
 proxy_add 路由处理函数
 
 功能描述：
@@ -336,7 +351,6 @@ proxy_add 路由处理函数用于处理 /proxy_add 路由的 GET 和 POST 请�
 处理完后，重定向到 dashboard 路由。
 
 """
-
 
 @app.route('/proxy_add', methods=['GET', 'POST'])
 @login_required

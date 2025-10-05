@@ -112,3 +112,4 @@ class Xos_config(db.Model):
     proxy_mode = db.Column(db.Boolean, default=False)  # 默认为 False
     proxy_share = db.Column(db.Boolean, default=False)  # 默认为 False
     page_rows = db.Column(db.Integer, default=25)  # 默认为 25
+    gateway_health_check = db.Column(db.Boolean, default=True)  # 新增字段，默认开启

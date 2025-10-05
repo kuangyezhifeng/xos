@@ -133,6 +133,24 @@
                 </div>
             </div>
         </div>
+        <!-- 网关健康检测 -->
+        <div class="form-group">
+            <label class="col-form-label">网关健康检测 &nbsp;
+                <small>{% if config.gateway_health_check %}已启用{% else %}已关闭{% endif %}</small>
+            </label>
+            <div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="gateway_health_check" id="health_enable" value="enable"
+                        {% if config.gateway_health_check %}checked{% endif %}>
+                    <label class="form-check-label" for="health_enable">启用检测</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="gateway_health_check" id="health_disable" value="disable"
+                        {% if not config.gateway_health_check %}checked{% endif %}>
+                    <label class="form-check-label" for="health_disable">关闭检测</label>
+                </div>
+            </div>
+        </div>
 
         <div class="button-container">
             <button type="submit" class="btn col-sm-5">保存</button>
