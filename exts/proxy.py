@@ -20,33 +20,34 @@ import socket
 
 # 配置你的操作日志
 logging.basicConfig(
-    filename='/var/log/xos.txt',
+    filename="/var/log/xos.txt",
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 # 屏蔽 Flask 的 HTTP 访问日志
-logging.getLogger('werkzeug').setLevel(logging.ERROR)
-logging.getLogger('werkzeug').propagate = False
+logging.getLogger("werkzeug").setLevel(logging.ERROR)
+logging.getLogger("werkzeug").propagate = False
 
 # xray配置文件路径
-CONFIG_PATH = '/usr/local/xos/xray/config.json'
-CHECK_PATH = '/usr/local/xos/xray/xray-check.json'
-HYSTERIA2_FOLDER = '/etc/hysteria2/'
-XRAY = '/etc/systemd/system/xray.service'
-XRAY_CHECK = '/etc/systemd/system/xray-check.service'
+CONFIG_PATH = "/usr/local/xos/xray/config.json"
+CHECK_PATH = "/usr/local/xos/xray/xray-check.json"
+HYSTERIA2_FOLDER = "/etc/hysteria2/"
+XRAY = "/etc/systemd/system/xray.service"
+XRAY_CHECK = "/etc/systemd/system/xray-check.service"
 INVALID_URL_MESSAGE = "无效的连接URL"
 EXISTING_OUTBOUND_MESSAGE = "已存在相同的出站配置"
 TPROXY_PORT = 12345
-TPROXY_IP = '127.0.0.1'
+TPROXY_IP = "127.0.0.1"
 test_result = {}
 update_in_progress = False
+
 
 def update_handler():
     global update_in_progress
     # 创建备份目录的路径
     backup_dir_name = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
-    backup_dir_path = os.path.join('/xos', backup_dir_name)
+    backup_dir_path = os.path.join("/xos", backup_dir_name)
     try:
         # 检查更新操作是否正在进行中，如果是则直接返回
         if update_in_progress:
@@ -85,8 +86,8 @@ def update_handler():
         # 创建一个at任务，延迟1分执行xos.sh脚本
         start_xos1 = 'echo "/usr/local/xos/static/xos.sh" | at now + 1 minutes'
         start_xos2 = 'echo "/usr/local/xos/static/xos.sh" | at now + 2 minutes'
-        stop_xos1 = 'pkill -f app.py'
-        stop_xos2 = 'pkill -f app.py'
+        stop_xos1 = "pkill -f app.py"
+        stop_xos2 = "pkill -f app.py"
         os.system(start_xos1)
         os.system(start_xos2)
         os.system(stop_xos1)
@@ -105,70 +106,84 @@ def update_handler():
 def create_fwmark_rule_and_local_route():
     # 检查是否存在规则
     ip_rule = f"ip rule show"
-    if 'lookup 100' in subprocess.getstatusoutput(ip_rule)[1]:
+    if "lookup 100" in subprocess.getstatusoutput(ip_rule)[1]:
         logging.info("IP路由规则已经存在.")
     else:
-        subprocess.run(['ip', 'rule', 'add', 'fwmark', '0x40/0xc0', 'table', '100'], timeout=10)
+        subprocess.run(
+            ["ip", "rule", "add", "fwmark", "0x40/0xc0", "table", "100"], timeout=10
+        )
         logging.info("规则添加成功.")
 
     route_rule = f"ip route add local 0.0.0.0/0 dev lo table 100"
     subprocess.getstatusoutput(route_rule)
-    if ' File exists' not in subprocess.getstatusoutput(route_rule)[1]:
+    if " File exists" not in subprocess.getstatusoutput(route_rule)[1]:
         logging.info("XOS透明路由规则已经添加.")
-
 
 
 def reset_transparent_proxy_config():
     try:
         # 清除原有规则
-        subprocess.run('iptables -F -t mangle', shell=True)
+        subprocess.run("iptables -F -t mangle", shell=True)
 
         # 创建不存在的链
-        for chain in ['TP_MARK', 'TP_OUT', 'TP_PRE', 'TP_RULE']:
-            subprocess.run(f'iptables -t mangle -N {chain} 2>/dev/null || true', shell=True)
+        for chain in ["TP_MARK", "TP_OUT", "TP_PRE", "TP_RULE"]:
+            subprocess.run(
+                f"iptables -t mangle -N {chain} 2>/dev/null || true", shell=True
+            )
 
         # === 入口链关联 ===
-        subprocess.run('iptables -t mangle -A PREROUTING -j TP_PRE; iptables -t mangle -A OUTPUT -j TP_OUT', shell=True)
+        subprocess.run(
+            "iptables -t mangle -A PREROUTING -j TP_PRE; iptables -t mangle -A OUTPUT -j TP_OUT",
+            shell=True,
+        )
 
         # === 标记新连接 (TCP + UDP) ===
         subprocess.run(
-            'iptables -t mangle -A TP_MARK -m conntrack --ctstate NEW -p tcp -j MARK --set-xmark 0x40/0x40; '
-            'iptables -t mangle -A TP_MARK -m conntrack --ctstate NEW -p udp -j MARK --set-xmark 0x40/0x40; '
-            'iptables -t mangle -A TP_MARK -j CONNMARK --save-mark', shell=True)
+            "iptables -t mangle -A TP_MARK -m conntrack --ctstate NEW -p tcp -j MARK --set-xmark 0x40/0x40; "
+            "iptables -t mangle -A TP_MARK -m conntrack --ctstate NEW -p udp -j MARK --set-xmark 0x40/0x40; "
+            "iptables -t mangle -A TP_MARK -j CONNMARK --save-mark",
+            shell=True,
+        )
 
         # === TP_OUT 链 (处理本地发出的流量) ===
         subprocess.run(
-            'iptables -t mangle -A TP_OUT -m owner --uid-owner 1001 -j RETURN; '
-            'iptables -t mangle -A TP_OUT -m mark --mark 0x80/0x80 -j RETURN; '
-            'iptables -t mangle -A TP_OUT -m addrtype --src-type LOCAL ! --dst-type LOCAL -j TP_RULE', shell=True)
+            "iptables -t mangle -A TP_OUT -m owner --uid-owner 1001 -j RETURN; "
+            "iptables -t mangle -A TP_OUT -m mark --mark 0x80/0x80 -j RETURN; "
+            "iptables -t mangle -A TP_OUT -m addrtype --src-type LOCAL ! --dst-type LOCAL -j TP_RULE",
+            shell=True,
+        )
 
         # === TP_PRE 链 (处理外部流量) ===
         subprocess.run(
-            'iptables -t mangle -A TP_PRE -m mark --mark 0x80/0x80 -j RETURN; '
-            'iptables -t mangle -A TP_PRE -i lo -m mark ! --mark 0x40/0xc0 -j RETURN; '
-            'iptables -t mangle -A TP_PRE -m addrtype ! --src-type LOCAL ! --dst-type LOCAL -j TP_RULE; '
-            'iptables -t mangle -A TP_PRE -m mark --mark 0x40/0xc0 -p tcp -j TPROXY --on-port 12345 --on-ip 127.0.0.1; '
-            'iptables -t mangle -A TP_PRE -m mark --mark 0x40/0xc0 -p udp -j TPROXY --on-port 12345 --on-ip 127.0.0.1', shell=True)
+            "iptables -t mangle -A TP_PRE -m mark --mark 0x80/0x80 -j RETURN; "
+            "iptables -t mangle -A TP_PRE -i lo -m mark ! --mark 0x40/0xc0 -j RETURN; "
+            "iptables -t mangle -A TP_PRE -m addrtype ! --src-type LOCAL ! --dst-type LOCAL -j TP_RULE; "
+            "iptables -t mangle -A TP_PRE -m mark --mark 0x40/0xc0 -p tcp -j TPROXY --on-port 12345 --on-ip 127.0.0.1; "
+            "iptables -t mangle -A TP_PRE -m mark --mark 0x40/0xc0 -p udp -j TPROXY --on-port 12345 --on-ip 127.0.0.1",
+            shell=True,
+        )
 
         # === TP_RULE 链 (处理具体规则) ===
         subprocess.run(
-            'iptables -t mangle -A TP_RULE -j CONNMARK --restore-mark; '
-            'iptables -t mangle -A TP_RULE -m mark --mark 0x40/0xc0 -j RETURN; '
-            'iptables -t mangle -A TP_RULE -i docker+ -j RETURN; '
-            'iptables -t mangle -A TP_RULE -i br+ -j RETURN; '
-            'iptables -t mangle -A TP_RULE -i veth+ -j RETURN; '
-            'iptables -t mangle -A TP_RULE -i ppp+ -j RETURN; '
-            'iptables -t mangle -A TP_RULE -p udp --dport 53 -j TP_MARK; '
-            'iptables -t mangle -A TP_RULE -p tcp --dport 53 -j TP_MARK; '
-            'iptables -t mangle -A TP_RULE -m mark --mark 0x40/0xc0 -j RETURN; '
-            'iptables -t mangle -A TP_RULE -d 10.0.0.0/8 -j RETURN; '
-            'iptables -t mangle -A TP_RULE -d 100.64.0.0/10 -j RETURN; '
-            'iptables -t mangle -A TP_RULE -d 169.254.0.0/16 -j RETURN; '
-            'iptables -t mangle -A TP_RULE -d 172.16.0.0/12 -j RETURN; '
-            'iptables -t mangle -A TP_RULE -d 192.168.0.0/16 -j RETURN; '
-            'iptables -t mangle -A TP_RULE -d 224.0.0.0/4 -j RETURN; '
-            'iptables -t mangle -A TP_RULE -d 240.0.0.0/4 -j RETURN; '
-            'iptables -t mangle -A TP_RULE -j TP_MARK', shell=True)
+            "iptables -t mangle -A TP_RULE -j CONNMARK --restore-mark; "
+            "iptables -t mangle -A TP_RULE -m mark --mark 0x40/0xc0 -j RETURN; "
+            "iptables -t mangle -A TP_RULE -i docker+ -j RETURN; "
+            "iptables -t mangle -A TP_RULE -i br+ -j RETURN; "
+            "iptables -t mangle -A TP_RULE -i veth+ -j RETURN; "
+            "iptables -t mangle -A TP_RULE -i ppp+ -j RETURN; "
+            "iptables -t mangle -A TP_RULE -p udp --dport 53 -j TP_MARK; "
+            "iptables -t mangle -A TP_RULE -p tcp --dport 53 -j TP_MARK; "
+            "iptables -t mangle -A TP_RULE -m mark --mark 0x40/0xc0 -j RETURN; "
+            "iptables -t mangle -A TP_RULE -d 10.0.0.0/8 -j RETURN; "
+            "iptables -t mangle -A TP_RULE -d 100.64.0.0/10 -j RETURN; "
+            "iptables -t mangle -A TP_RULE -d 169.254.0.0/16 -j RETURN; "
+            "iptables -t mangle -A TP_RULE -d 172.16.0.0/12 -j RETURN; "
+            "iptables -t mangle -A TP_RULE -d 192.168.0.0/16 -j RETURN; "
+            "iptables -t mangle -A TP_RULE -d 224.0.0.0/4 -j RETURN; "
+            "iptables -t mangle -A TP_RULE -d 240.0.0.0/4 -j RETURN; "
+            "iptables -t mangle -A TP_RULE -j TP_MARK",
+            shell=True,
+        )
 
         logging.info("重置透明代理配置成功。")
 
@@ -177,43 +192,47 @@ def reset_transparent_proxy_config():
     # 添加xray用户安装hysteria2程序
     xray_useradd()
 
+
 def restart_xos_service():
     """
     重启 xos 面板服务
     返回包含状态、输出和带图标的消息（使用 ✅❌）
     """
     result = subprocess.run(
-        ['systemctl', 'restart', 'xos.service'],
+        ["systemctl", "restart", "xos.service"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
+        text=True,
     )
 
     success = result.returncode == 0
 
     if success:
-        message = '✅ xos.service 重启成功'
+        message = "✅ xos.service 重启成功"
         logging.info(message)
     else:
-        message = f'❌ xos.service 重启失败，错误码: {result.returncode}'
+        message = f"❌ xos.service 重启失败，错误码: {result.returncode}"
         logging.error(message)
         if result.stderr.strip():
-            logging.error(f'stderr: {result.stderr.strip()}')
+            logging.error(f"stderr: {result.stderr.strip()}")
         if result.stdout.strip():
-            logging.info(f'stdout: {result.stdout.strip()}')
+            logging.info(f"stdout: {result.stdout.strip()}")
 
     return {
-        'success': success,
-        'message': message,
-        'stdout': result.stdout.strip(),
-        'stderr': result.stderr.strip()
+        "success": success,
+        "message": message,
+        "stdout": result.stdout.strip(),
+        "stderr": result.stderr.strip(),
     }
 
+
 def restore_system_state():
-    socat_count = db.session.query(RelayConnection).filter_by(status='1').count()
+    socat_count = db.session.query(RelayConnection).filter_by(status="1").count()
     # 执行带有管道的命令
     command = "ps -ef | grep socat | wc -l"
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(
+        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
 
     # 获取输出并转换为整数
     output, error = process.communicate()
@@ -241,24 +260,26 @@ def restore_system_state():
 
 def xray_useradd():
     # 定义 xray 用户名
-    xray_username = 'xray'
+    xray_username = "xray"
 
     # 检查用户是否存在
     try:
-        subprocess.check_output(['id', xray_username], stderr=subprocess.STDOUT)
+        subprocess.check_output(["id", xray_username], stderr=subprocess.STDOUT)
         logging.info(f"✅用户 '{xray_username}' 已存在。")
     except subprocess.CalledProcessError:
         # 如果用户不存在，则创建用户
-        subprocess.run(['useradd', '-m', '-s', '/bin/bash', xray_username])
+        subprocess.run(["useradd", "-m", "-s", "/bin/bash", xray_username])
         # 改变目录所有权
         logging.info(f"✅用户 '{xray_username}' 创建成功。")
 
     # 获取用户的 uid
-    uid_output = subprocess.check_output(['id', '-u', xray_username]).decode().strip()
+    uid_output = subprocess.check_output(["id", "-u", xray_username]).decode().strip()
     user_uid = int(uid_output)
 
     # 添加 iptables 规则
-    iptables_rule = f"iptables -t mangle -I TP_OUT -m owner --uid-owner {user_uid} -j RETURN"
+    iptables_rule = (
+        f"iptables -t mangle -I TP_OUT -m owner --uid-owner {user_uid} -j RETURN"
+    )
 
     try:
         subprocess.run(iptables_rule, shell=True, check=True)
@@ -277,9 +298,8 @@ def set_tag(proxies):
         db.session.commit()
 
 
-
 def set_config(proxies):
-    if proxies.protocol == 'hysteria2':
+    if proxies.protocol == "hysteria2":
         if proxies.flag == 1:
             xray_node_outbound_remove(proxies.tag)
             uninstall_hysteria2_service(proxies.tag)
@@ -297,28 +317,48 @@ def set_config(proxies):
 
 def switch_proxy_mode(mode):
     if mode == "local":
-        sed_command = ['sed', '-i', 's/^#*net\\.ipv4\\.ip_forward.*/net.ipv4.ip_forward = 1/', '/etc/sysctl.conf']
-        sed_process = subprocess.run(sed_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(['iptables', '-F', '-t', 'mangle'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        sed_command = [
+            "sed",
+            "-i",
+            "s/^#*net\\.ipv4\\.ip_forward.*/net.ipv4.ip_forward = 1/",
+            "/etc/sysctl.conf",
+        ]
+        sed_process = subprocess.run(
+            sed_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        subprocess.run(
+            ["iptables", "-F", "-t", "mangle"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         Xos_config.query.update({"proxy_mode": False})
     else:
-        sed_command = ['sed', '-i', 's/^#*net\\.ipv4\\.ip_forward.*/net.ipv4.ip_forward = 0/', '/etc/sysctl.conf']
-        sed_process = subprocess.run(sed_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        sed_command = [
+            "sed",
+            "-i",
+            "s/^#*net\\.ipv4\\.ip_forward.*/net.ipv4.ip_forward = 0/",
+            "/etc/sysctl.conf",
+        ]
+        sed_process = subprocess.run(
+            sed_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         create_fwmark_rule_and_local_route()
         reset_transparent_proxy_config()
         Xos_config.query.update({"proxy_mode": True})
 
     # 如果 sed 命令执行成功，则继续执行 sysctl 命令
     if sed_process.returncode == 0:
-        sysctl_process = subprocess.run(['sysctl', '-p'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        sysctl_process = subprocess.run(
+            ["sysctl", "-p"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         # 如果 sysctl 命令也执行成功，则提交数据库更改
         if sysctl_process.returncode == 0:
-            logging.info('sysctl 命令执行成功')
+            logging.info("sysctl 命令执行成功")
             # 提交修改到数据库
             db.session.commit()
-            logging.info(f'切换代理模式{mode}成功')
+            logging.info(f"切换代理模式{mode}成功")
         else:
-            logging.error('切换代理模式{mode}失败')
+            logging.error("切换代理模式{mode}失败")
 
 
 def switch_proxy_share(proxy_share):
@@ -328,52 +368,29 @@ def switch_proxy_share(proxy_share):
             "protocol": "vmess",
             "settings": {
                 "clients": [
-                    {
-                        "id": "57969d78-64a6-4aed-dcb9-94c2296cabfd",
-                        "alterId": 0
-                    }
+                    {"id": "57969d78-64a6-4aed-dcb9-94c2296cabfd", "alterId": 0}
                 ],
-                "disableInsecureEncryption": False
+                "disableInsecureEncryption": False,
             },
             "streamSettings": {
                 "network": "tcp",
                 "security": "none",
-                "tcpSettings": {
-                    "header": {
-                        "type": "none"
-                    }
-                }
+                "tcpSettings": {"header": {"type": "none"}},
             },
             "tag": "vmess",
-            "sniffing": {
-                "enabled": True,
-                "destOverride": [
-                    "http",
-                    "tls"
-                ]
-            }
+            "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
         },
         {
             "port": 1988,
             "protocol": "socks",
-            "settings": {
-                "auth": "noauth",
-                "udp": True
-            },
+            "settings": {"auth": "noauth", "udp": True},
             "streamSettings": {
                 "network": "tcp",
                 "security": "none",
-                "tcpSettings": {
-                    "header": {
-                        "type": "none"
-                    }
-                }
+                "tcpSettings": {"header": {"type": "none"}},
             },
-            "sniffing": {
-                "enabled": True,
-                "destOverride": ["http", "tls"]
-            }
-        }
+            "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
+        },
     ]
     # 先加载当前的 xray 配置
     xray_config = load_xray_config(CONFIG_PATH)
@@ -401,9 +418,12 @@ def switch_proxy_share(proxy_share):
 
     save_xray_config(xray_config, CONFIG_PATH)
 
+
 def set_page_number(number):
     # 构造 sed 命令
-    sed_command = "sed -i 's/PER_PAGE = .*/PER_PAGE = {}/g' /usr/local/xos/app.py".format(number)
+    sed_command = (
+        "sed -i 's/PER_PAGE = .*/PER_PAGE = {}/g' /usr/local/xos/app.py".format(number)
+    )
     subprocess.run(sed_command, shell=True)
 
     at_command = 'echo "/usr/local/xos/static/xos.sh" | at now + 1 minutes'
@@ -422,10 +442,10 @@ def is_local_port_in_use(port):
         # 执行系统命令并获取输出
         output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
         # 解析命令输出，检查是否有监听端口的行
-        output = output.decode('utf-8')
-        lines = output.strip().split('\n')
+        output = output.decode("utf-8")
+        lines = output.strip().split("\n")
         for line in lines:
-            if line.strip() != '':
+            if line.strip() != "":
                 # 如果找到监听端口的行，则返回True
                 return True
     except subprocess.CalledProcessError:
@@ -434,18 +454,21 @@ def is_local_port_in_use(port):
     # 如果没有找到监听端口的行，则返回False
     return False
 
+
 def reset_xray_services():
     # 使用 os.system 创建文件夹
     os.system("mkdir -p /usr/local/xos/xray")
     try:
-        xray_tar_path = '/usr/local/xos/static/xray.tar.gz'  # 使用相对路径，确保 xray.tar.gz 与脚本在同一目录下
-        extract_path = '/usr/local/xos/'
+        xray_tar_path = (
+            "/usr/local/xos/static/xray.tar.gz"  # 使用相对路径，确保 xray.tar.gz 与脚本在同一目录下
+        )
+        extract_path = "/usr/local/xos/"
 
-        with tarfile.open(xray_tar_path, 'r') as tar:
+        with tarfile.open(xray_tar_path, "r") as tar:
             tar.extractall(path=extract_path)
 
         # 创建日志目录
-        log_directory = '/var/log/xray'
+        log_directory = "/var/log/xray"
         if not os.path.exists(log_directory):
             os.makedirs(log_directory)
 
@@ -508,15 +531,15 @@ WantedBy=multi-user.target
 
     # 启用服务
     # 重新载入服务
-    subprocess.run(['systemctl', 'daemon-reload'])
+    subprocess.run(["systemctl", "daemon-reload"])
 
     # 启用服务
-    subprocess.run(['systemctl', 'enable', 'xray.service'])
-    subprocess.run(['systemctl', 'enable', 'xray-check.service'])
+    subprocess.run(["systemctl", "enable", "xray.service"])
+    subprocess.run(["systemctl", "enable", "xray-check.service"])
 
     # 重启服务
-    subprocess.run(['systemctl', 'restart', 'xray.service'])
-    subprocess.run(['systemctl', 'restart', 'xray-check.service'])
+    subprocess.run(["systemctl", "restart", "xray.service"])
+    subprocess.run(["systemctl", "restart", "xray-check.service"])
 
     logging.info("Xray服务重置成功。")
 
@@ -534,18 +557,24 @@ def gateway_route_config():
     target_ips = []
 
     # 获取所有已启用access_ip
-    target_ips = ProxyDevice.query.with_entities(
-        ProxyDevice.access_ip, ProxyDevice.tag, ProxyDevice.gateway
-    ).filter(
-        ProxyDevice.flag == 1
-    ).all()
+    target_ips = (
+        ProxyDevice.query.with_entities(
+            ProxyDevice.access_ip, ProxyDevice.tag, ProxyDevice.gateway
+        )
+        .filter(ProxyDevice.flag == 1)
+        .all()
+    )
 
     # 获取所有gateway为1的值
-    selected_target_ips = set((ip, tag) for ip, tag in ProxyDevice.query.filter(
-        (ProxyDevice.gateway == 1)).with_entities(ProxyDevice.access_ip, ProxyDevice.tag).all())
+    selected_target_ips = set(
+        (ip, tag)
+        for ip, tag in ProxyDevice.query.filter((ProxyDevice.gateway == 1))
+        .with_entities(ProxyDevice.access_ip, ProxyDevice.tag)
+        .all()
+    )
 
     target_ips_with_selection = [
-        {'ip': ip, 'tag': tag, 'selected': (ip, tag) in selected_target_ips}
+        {"ip": ip, "tag": tag, "selected": (ip, tag) in selected_target_ips}
         for ip, tag, gateway in target_ips
     ]
 
@@ -558,10 +587,9 @@ def gateway_route_savedb(selected_target_ips):
 
     # 将所有选中的 access_ip 对应的记录的 gateway 字段设置为 1
     for combined_ip_tag in selected_target_ips:
-        ip, tag = combined_ip_tag.split('|')
+        ip, tag = combined_ip_tag.split("|")
         ProxyDevice.query.filter_by(access_ip=ip, tag=tag).update(
-            {"gateway": 1},
-            synchronize_session=False
+            {"gateway": 1}, synchronize_session=False
         )
 
     db.session.commit()
@@ -593,12 +621,16 @@ def gateway_route_set():
 
     # 如果有 tags，更新或新增默认网关 balancer
     if replaced_tags:
-        balancer = next((b for b in existing_balancers if b.get("tag") == "balancer"), None)
+        balancer = next(
+            (b for b in existing_balancers if b.get("tag") == "balancer"), None
+        )
         if balancer:
-            balancer.update({
-                "selector": replaced_tags,
-                "strategy": {"type": "roundRobin"},
-            })
+            balancer.update(
+                {
+                    "selector": replaced_tags,
+                    "strategy": {"type": "roundRobin"},
+                }
+            )
             if enable_health_check:
                 balancer["fallbackTag"] = "blocked"
         else:
@@ -612,7 +644,9 @@ def gateway_route_set():
             existing_balancers.append(balancer)
     # 如果没有 tags，移除默认网关 balancer
     else:
-        existing_balancers = [b for b in existing_balancers if b.get("tag") != "balancer"]
+        existing_balancers = [
+            b for b in existing_balancers if b.get("tag") != "balancer"
+        ]
 
     xray_config["routing"]["balancers"] = existing_balancers
 
@@ -624,7 +658,7 @@ def gateway_route_set():
             "subjectSelector": replaced_tags,
             "probeUrl": "http://connect.rom.miui.com/generate_204",
             "probeInterval": "100s",
-            "enableConcurrency": True
+            "enableConcurrency": True,
         }
     else:
         xray_config.pop("observatory", None)
@@ -659,11 +693,14 @@ def gateway_route_set():
 
 def reset_xray_config():
     # 将所有 flag 为 1 的记录的 flag 字段更新为 0
-    db.session.query(ProxyDevice).filter(ProxyDevice.flag == 1).update({'flag': 0}, synchronize_session=False)
+    db.session.query(ProxyDevice).filter(ProxyDevice.flag == 1).update(
+        {"flag": 0}, synchronize_session=False
+    )
 
     # 将所有 gateway 为 '是' 的记录的 gateway 字段更新为 '否'
-    db.session.query(ProxyDevice).filter(ProxyDevice.gateway == 1).update({'gateway': 0},
-                                                                          synchronize_session=False)
+    db.session.query(ProxyDevice).filter(ProxyDevice.gateway == 1).update(
+        {"gateway": 0}, synchronize_session=False
+    )
     # 提交更改
     db.session.commit()
 
@@ -672,7 +709,7 @@ def reset_xray_config():
         "log": {
             "loglevel": "warning",
             "error": "/var/log/xray/error.log",
-            "access": "/var/log/xray/access.log"
+            "access": "/var/log/xray/access.log",
         },
         "inbounds": [
             {
@@ -682,50 +719,30 @@ def reset_xray_config():
                 "settings": {
                     "network": "tcp,udp",
                     "udpIdleTimeout": 600,
-                    "followRedirect": True
+                    "followRedirect": True,
                 },
-                "sniffing": {
-                    "enabled": True,
-                    "destOverride": ["http", "tls"]
-                },
+                "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
                 "streamSettings": {
-                    "sockopt": {
-                        "tproxy": "tproxy",
-                        "udpFragment": True
-                    }
-                }
+                    "sockopt": {"tproxy": "tproxy", "udpFragment": True}
+                },
             }
         ],
         "outbounds": [
             {
                 "tag": "direct",
                 "protocol": "freedom",
-                "settings": {
-                    "domainStrategy": "UseIP"
-                },
-                "streamSettings": {
-                    "sockopt": {
-                        "mark": 128
-                    }
-                }
+                "settings": {"domainStrategy": "UseIP"},
+                "streamSettings": {"sockopt": {"mark": 128}},
             },
             {
                 "tag": "dns-out",
                 "protocol": "dns",
-                "settings": {
-                    "address": "8.8.8.8"
-                },
-                "streamSettings": {
-                    "sockopt": {
-                        "mark": 128
-                    }
-                }
-            }
+                "settings": {"address": "8.8.8.8"},
+                "streamSettings": {"sockopt": {"mark": 128}},
+            },
         ],
         "dns": {
-            "hosts": {
-                "dns.google": ["8.8.8.8", "8.8.4.4"]
-            },
+            "hosts": {"dns.google": ["8.8.8.8", "8.8.4.4"]},
             "servers": [
                 "8.8.8.8",
                 "1.1.1.1",
@@ -733,15 +750,15 @@ def reset_xray_config():
                     "address": "114.114.114.114",
                     "port": 53,
                     "domains": ["geosite:cn"],
-                    "expectIPs": ["geoip:cn"]
+                    "expectIPs": ["geoip:cn"],
                 },
                 {
                     "address": "223.5.5.5",
                     "port": 53,
                     "domains": ["geosite:cn"],
-                    "expectIPs": ["geoip:cn"]
-                }
-            ]
+                    "expectIPs": ["geoip:cn"],
+                },
+            ],
         },
         "routing": {
             "domainStrategy": "IPIfNonMatch",
@@ -750,7 +767,7 @@ def reset_xray_config():
                     "type": "field",
                     "inboundTag": ["all-in"],
                     "port": 53,
-                    "outboundTag": "dns-out"
+                    "outboundTag": "dns-out",
                 },
                 {
                     "type": "field",
@@ -761,14 +778,13 @@ def reset_xray_config():
                         "10.0.0.0/8",
                         "114.114.114.114",
                         "223.5.5.5",
-                        "geoip:private"
+                        "geoip:private",
                     ],
-                    "outboundTag": "direct"
-                }
-            ]
-        }
+                    "outboundTag": "direct",
+                },
+            ],
+        },
     }
-
 
     # Xray Check Config
     xray_check_config_content = {
@@ -777,55 +793,28 @@ def reset_xray_config():
                 "tag": "1233",
                 "port": 1233,
                 "protocol": "socks",
-                "settings": {
-                    "auth": "noauth",
-                    "udp": True
-                },
+                "settings": {"auth": "noauth", "udp": True},
                 "streamSettings": {
                     "network": "tcp",
                     "security": "none",
-                    "tcpSettings": {
-                        "header": {
-                            "type": "none"
-                        }
-                    }
+                    "tcpSettings": {"header": {"type": "none"}},
                 },
-                "sniffing": {
-                    "enabled": True,
-                    "destOverride": [
-                        "http",
-                        "tls"
-                    ]
-                }
+                "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
             }
         ],
         "outbounds": [
             {
                 "tag": "direct",
                 "protocol": "freedom",
-                "settings": {
-                    "domainStrategy": "AsIs"
-                },
-                "streamSettings": {
-                    "sockopt": {
-                        "mark": 128
-                    }
-                }
+                "settings": {"domainStrategy": "AsIs"},
+                "streamSettings": {"sockopt": {"mark": 128}},
             },
             {
                 "tag": "dns-out",
                 "protocol": "dns",
-                "settings": {
-                    "address": "8.8.8.8"
-                },
-                "proxySettings": {
-                    "tag": "proxy"
-                },
-                "streamSettings": {
-                    "sockopt": {
-                        "mark": 128
-                    }
-                }
+                "settings": {"address": "8.8.8.8"},
+                "proxySettings": {"tag": "proxy"},
+                "streamSettings": {"sockopt": {"mark": 128}},
             },
             {
                 "tag": "proxy",
@@ -838,38 +827,25 @@ def reset_xray_config():
                             "users": [
                                 {
                                     "id": "5cfc2e53-eff1-3f51-a9d3-6244ba61a1f6",
-                                    "security": "auto"
+                                    "security": "auto",
                                 }
-                            ]
+                            ],
                         }
                     ]
                 },
                 "streamSettings": {
                     "network": "ws",
-                    "sockopt": {
-                        "mark": 128,
-                        "tcpFastOpen": True
-                    },
+                    "sockopt": {"mark": 128, "tcpFastOpen": True},
                     "wsSettings": {
                         "path": "/6",
-                        "headers": {
-                            "Host": "live.bilibili.com"
-                        }
-                    }
-                }
-            }
+                        "headers": {"Host": "live.bilibili.com"},
+                    },
+                },
+            },
         ],
         "dns": {
-            "hosts": {
-                "dns.google": [
-                    "8.8.8.8",
-                    "8.8.4.4"
-                ]
-            },
-            "servers": [
-                "8.8.8.8",
-                "1.1.1.1"
-            ]
+            "hosts": {"dns.google": ["8.8.8.8", "8.8.4.4"]},
+            "servers": ["8.8.8.8", "1.1.1.1"],
         },
         "routing": {
             "domainStrategy": "IPOnDemand",
@@ -877,38 +853,19 @@ def reset_xray_config():
             "rules": [
                 {
                     "type": "field",
-                    "inboundTag": [
-                        "all-in"
-                    ],
+                    "inboundTag": ["all-in"],
                     "port": 53,
-                    "outboundTag": "dns-out"
+                    "outboundTag": "dns-out",
                 },
+                {"type": "field", "ip": ["8.8.8.8", "1.1.1.1"], "outboundTag": "proxy"},
                 {
                     "type": "field",
-                    "ip": [
-                        "8.8.8.8",
-                        "1.1.1.1"
-                    ],
-                    "outboundTag": "proxy"
+                    "ip": ["geoip:private", "127.0.0.1/8", "192.168.1.0/24"],
+                    "outboundTag": "direct",
                 },
-                {
-                    "type": "field",
-                    "ip": [
-                        "geoip:private",
-                        "127.0.0.1/8",
-                        "192.168.1.0/24"
-                    ],
-                    "outboundTag": "direct"
-                },
-                {
-                    "type": "field",
-                    "inboundTag": [
-                        "1233"
-                    ],
-                    "outboundTag": "proxy"
-                }
-            ]
-        }
+                {"type": "field", "inboundTag": ["1233"], "outboundTag": "proxy"},
+            ],
+        },
     }
 
     save_xray_config(xray_config_content, CONFIG_PATH)
@@ -922,56 +879,35 @@ def proxy_lan_share():
             "protocol": "vmess",
             "settings": {
                 "clients": [
-                    {
-                        "id": "57969d78-64a6-4aed-dcb9-94c2296cabfd",
-                        "alterId": 0
-                    }
+                    {"id": "57969d78-64a6-4aed-dcb9-94c2296cabfd", "alterId": 0}
                 ],
-                "disableInsecureEncryption": False
+                "disableInsecureEncryption": False,
             },
             "streamSettings": {
                 "network": "tcp",
                 "security": "none",
-                "tcpSettings": {
-                    "header": {
-                        "type": "none"
-                    }
-                }
+                "tcpSettings": {"header": {"type": "none"}},
             },
             "tag": "vmess",
-            "sniffing": {
-                "enabled": True,
-                "destOverride": [
-                    "http",
-                    "tls"
-                ]
-            }
+            "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
         },
         {
             "port": 1988,
             "protocol": "socks",
-            "settings": {
-                "auth": "noauth",
-                "udp": True
-            },
+            "settings": {"auth": "noauth", "udp": True},
             "streamSettings": {
                 "network": "tcp",
                 "security": "none",
-                "tcpSettings": {
-                    "header": {
-                        "type": "none"
-                    }
-                }
+                "tcpSettings": {"header": {"type": "none"}},
             },
-            "sniffing": {
-                "enabled": True,
-                "destOverride": ["http", "tls"]
-            }
-        }
+            "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
+        },
     ]
 
     xray_config = load_xray_config(CONFIG_PATH)
-    xray_config["inbounds"].extend(share_config)  # 使用 extend 方法将列表中的字典添加到 xray_config["inbounds"] 中
+    xray_config["inbounds"].extend(
+        share_config
+    )  # 使用 extend 方法将列表中的字典添加到 xray_config["inbounds"] 中
     save_xray_config(xray_config, CONFIG_PATH)
 
 
@@ -989,6 +925,7 @@ def uninstall_hysteria2_service(tag):
     logging.info(f"✅已卸载hysteria2服务: {tag}")
 
     return True
+
 
 """
 decode_vmess_link 函数
@@ -1013,7 +950,9 @@ proxy_url: 经过 Base64 编码的 Vmess 链接。
 
 def decode_vmess_link(proxy_url):
     try:
-        decoded_vmess = base64.urlsafe_b64decode(proxy_url[8:] + '=' * (4 - len(proxy_url) % 4)).decode('utf-8')
+        decoded_vmess = base64.urlsafe_b64decode(
+            proxy_url[8:] + "=" * (4 - len(proxy_url) % 4)
+        ).decode("utf-8")
         return json.loads(decoded_vmess)
 
     except (TypeError, json.JSONDecodeError, UnicodeDecodeError) as e:
@@ -1024,8 +963,8 @@ def decode_vmess_link(proxy_url):
 def encode_vmess_link(vmess_json):
     try:
         vmess_str = json.dumps(vmess_json)
-        vmess_bytes = vmess_str.encode('utf-8')
-        return 'vmess://' + base64.b64encode(vmess_bytes).decode('utf-8')
+        vmess_bytes = vmess_str.encode("utf-8")
+        return "vmess://" + base64.b64encode(vmess_bytes).decode("utf-8")
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         return None
 
@@ -1035,7 +974,7 @@ def extract_base64(data):
     if start_index == -1:
         return None
 
-    vmess_data = data[start_index + len("vmess://"):]
+    vmess_data = data[start_index + len("vmess://") :]
     return vmess_data
 
 
@@ -1044,7 +983,7 @@ def parse_vmess_subscription(subscribe_url):
         return_content = urlopen(subscribe_url).read()
         share_links = urlsafe_b64decode(return_content).decode("utf-8").splitlines()
     except Exception:
-        logging.error(f'订阅连接异常: {subscribe_url}')
+        logging.error(f"订阅连接异常: {subscribe_url}")
         return []
 
     configs = []
@@ -1071,7 +1010,7 @@ def parse_vmess_subscription(subscribe_url):
 
 def decode_vless_link(vless_url):
     # 正则表达式模式：匹配 vless 链接的两种格式
-    pattern = r'vless://([^@]+)@([^:/?#]+):(\d+)([^#]*)(?:#([^?]+))?'
+    pattern = r"vless://([^@]+)@([^:/?#]+):(\d+)([^#]*)(?:#([^?]+))?"
 
     # 匹配正则表达式
     match = re.match(pattern, vless_url)
@@ -1082,38 +1021,43 @@ def decode_vless_link(vless_url):
 
         # 判断 email 是否为 None
         if email:
-            email_prefix = email.split('@')[0]
+            email_prefix = email.split("@")[0]
         else:
-            email_prefix = ''
+            email_prefix = ""
 
         # 解析 query 参数
-        query_params = dict(re.findall(r'&?([^=]+)=([^&]*)', query_fragment)) if query_fragment else {}
+        query_params = (
+            dict(re.findall(r"&?([^=]+)=([^&]*)", query_fragment))
+            if query_fragment
+            else {}
+        )
 
         # 获取特定的字段并解码 path 和 spx
         vless_info = {
-            'uuid': user_info,
-            'ip': ip,
-            'port': int(port),
-            'encryption': query_params.get('encryption', 'none'),
-            'flow': query_params.get('flow', ''),
-            'security': query_params.get('security', 'reality'),
-            'sni': query_params.get('sni', ''),
-            'fp': query_params.get('fp', ''),
-            'pbk': query_params.get('pbk', ''),
-            'type': query_params.get('type', 'tcp'),
-            'headerType': query_params.get('headerType', 'none'),
-            'email': email_prefix,
-            'path': unquote(query_params.get('path', '')),  # URL 解码
-            'spx': unquote(query_params.get('spx', '/')),  # 默认值为 '/'
-            'sid': query_params.get('sid', ''),
+            "uuid": user_info,
+            "ip": ip,
+            "port": int(port),
+            "encryption": query_params.get("encryption", "none"),
+            "flow": query_params.get("flow", ""),
+            "security": query_params.get("security", "reality"),
+            "sni": query_params.get("sni", ""),
+            "fp": query_params.get("fp", ""),
+            "pbk": query_params.get("pbk", ""),
+            "type": query_params.get("type", "tcp"),
+            "headerType": query_params.get("headerType", "none"),
+            "email": email_prefix,
+            "path": unquote(query_params.get("path", "")),  # URL 解码
+            "spx": unquote(query_params.get("spx", "/")),  # 默认值为 '/'
+            "sid": query_params.get("sid", ""),
         }
 
         return vless_info
 
     return None
 
+
 def custom_unquote(string):
-    return string.replace('%2F', '/')
+    return string.replace("%2F", "/")
 
 
 def decode_trojan_link(trojan_url):
@@ -1164,7 +1108,7 @@ def decode_trojan_link(trojan_url):
         "security": security,
         "alpn": alpn,
         "type": type_,
-        "header_type": header_type
+        "header_type": header_type,
     }
     return trojan_json
 
@@ -1192,7 +1136,7 @@ def decode_shadowsocks_link(ss_url):
         # 添加填充字符"="，直到长度是4的倍数
         missing_padding = len(base64_data) % 4
         if missing_padding != 0:
-            base64_data += '=' * (4 - missing_padding)
+            base64_data += "=" * (4 - missing_padding)
         decoded_data = base64.b64decode(base64_data).decode("utf-8")
 
         # 提取加密方法和密码
@@ -1203,7 +1147,7 @@ def decode_shadowsocks_link(ss_url):
             "method": method,
             "password": password,
             "server": server_address,
-            "port": int(server_port)
+            "port": int(server_port),
         }
         return shadowsocks_json
     except Exception as e:
@@ -1220,7 +1164,7 @@ def decode_hysteria2_url(hysteria2_url):
     server_port = hysteria2_url.split("@")[1].split("?")[0]
     server, port = server_port.split(":")
     # Remove any trailing slash from the port
-    port = port.rstrip('/')
+    port = port.rstrip("/")
     result["server"] = f"{server}:{port}"
 
     # Extract password
@@ -1232,7 +1176,10 @@ def decode_hysteria2_url(hysteria2_url):
     if len(sni_insecure_part) > 1:
         insecure_value = sni_insecure_part[1].split("=")[1]
         if insecure_value.isdigit():
-            result["tls"] = {"sni": sni_insecure_part[0], "insecure": bool(int(insecure_value))}
+            result["tls"] = {
+                "sni": sni_insecure_part[0],
+                "insecure": bool(int(insecure_value)),
+            }
         else:
             result["tls"] = {"sni": sni_insecure_part[0], "insecure": True}
     else:
@@ -1255,8 +1202,8 @@ def decode_hysteria2_url(hysteria2_url):
 
     # 添加带宽配置
     result["bandwidth"] = {
-        "up": "100 mbps",     # 最大上行带宽 100 Mbps
-        "down": "500 mbps"    # 最大下行带宽 500 Mbps
+        "up": "100 mbps",  # 最大上行带宽 100 Mbps
+        "down": "500 mbps",  # 最大下行带宽 500 Mbps
     }
 
     return result
@@ -1288,24 +1235,24 @@ socks_link: 经过自定义编码的 Socks 链接。
 def decode_socks_link(socks_link):
     try:
         # 如果链接以 socks:// 开头，去掉前缀
-        if socks_link.startswith('socks://'):
-            socks_link = socks_link[len('socks://'):]
+        if socks_link.startswith("socks://"):
+            socks_link = socks_link[len("socks://") :]
 
         # 格式: target_ip:port:username:password
-        parts = socks_link.split(':', 2)  # 只拆分前两个冒号，剩下的留给用户名和密码
+        parts = socks_link.split(":", 2)  # 只拆分前两个冒号，剩下的留给用户名和密码
 
         # 提取协议、目标 IP 和目标端口
-        protocol = 'socks'
+        protocol = "socks"
         target_ip = parts[0]
         target_port = int(parts[1])
 
         # 提取用户名和密码
-        remaining = parts[2].split(':', 1)  # 剩余部分再次以冒号拆分
+        remaining = parts[2].split(":", 1)  # 剩余部分再次以冒号拆分
         username = remaining[0]
         password = remaining[1] if len(remaining) > 1 else None
 
         # 验证协议
-        if protocol.lower() != 'socks':
+        if protocol.lower() != "socks":
             raise ValueError("不支持的协议")
 
         # 验证端口范围
@@ -1321,13 +1268,14 @@ def decode_socks_link(socks_link):
             "target_ip": target_ip,
             "target_port": target_port,
             "username": username,
-            "password": password
+            "password": password,
         }
         return decoded_data
 
     except Exception as e:
         logging.error(f"解码 SOCKS 连接时出错: {str(e)}")
         return None
+
 
 def get_all_access_ips():
     try:
@@ -1357,38 +1305,50 @@ xray_config: Xray 的配置信息。
 
 # 将节点域名转成IP地址
 def node_domain_set(xray_config, decode_data):
-    if decode_data.get('add'):
-        access_ip = decode_data.get('add')
-    elif decode_data.get('target_ip'):
-        access_ip = decode_data.get('target_ip')
-    elif decode_data.get('ip'):
-        access_ip = decode_data.get('ip')
-    elif decode_data.get('server'):
-        access_ip = decode_data.get('server')
+    if decode_data.get("add"):
+        access_ip = decode_data.get("add")
+    elif decode_data.get("target_ip"):
+        access_ip = decode_data.get("target_ip")
+    elif decode_data.get("ip"):
+        access_ip = decode_data.get("ip")
+    elif decode_data.get("server"):
+        access_ip = decode_data.get("server")
     else:
-        logging.info('hysteria2域名解析跳过')
+        logging.info("hysteria2域名解析跳过")
         return
     # 如果地址是域名，则解析域名并添加到文件中
 
     if access_ip and not is_ip_address(access_ip) and ":" not in access_ip:
         hostname = access_ip
-        #写入 DNS 配置文件
-        subprocess.run(['echo', '-e', '"nameserver 8.8.8.8\nnameserver 1.1.1.1"', '>', '/etc/resolv.conf'], shell=True)
+        # 写入 DNS 配置文件
+        subprocess.run(
+            [
+                "echo",
+                "-e",
+                '"nameserver 8.8.8.8\nnameserver 1.1.1.1"',
+                ">",
+                "/etc/resolv.conf",
+            ],
+            shell=True,
+        )
         # 执行命令PING解析域名并获取到IP地址
-        command = ['sudo', '-u', 'xray', 'ping', '-c', '1', hostname]
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        command = ["sudo", "-u", "xray", "ping", "-c", "1", hostname]
+        process = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         output, _ = process.communicate()
         # 解码输出
-        output = output.decode('utf-8')
+        output = output.decode("utf-8")
         # 使用正则表达式提取 IP 地址
-        ip_match = re.search(r'\(([0-9.]+)\)', output)
+        ip_match = re.search(r"\(([0-9.]+)\)", output)
         if ip_match:
             ip_address = ip_match.group(1)
             # 强制替换主机名对应的 IP 地址列表
-            xray_config['dns']['hosts'][hostname] = ip_address
+            xray_config["dns"]["hosts"][hostname] = ip_address
             logging.info(f"✅成功将域名 {hostname} 解析为 IP 地址: {ip_address}")
         else:
             logging.error(f"无法从 ping 输出中提取 IP 地址: {output}")
+
 
 """
 node_domain_unset 函数
@@ -1408,9 +1368,9 @@ xray_config: Xray 的配置信息。
 
 def node_domain_unset(hostname, xray_config):
     # 检查键是否存在
-    if hostname in xray_config['dns']['hosts']:
+    if hostname in xray_config["dns"]["hosts"]:
         # 删除键
-        deleted_ip_addresses = xray_config['dns']['hosts'].pop(hostname)
+        deleted_ip_addresses = xray_config["dns"]["hosts"].pop(hostname)
         logging.info(f"✅移除节点DNS {hostname} 对应的 IP 地址: {deleted_ip_addresses}")
     else:
         logging.info(f"✅{hostname} 不存在于文件中，无需删除")
@@ -1445,7 +1405,7 @@ def is_ip_or_domain(target_ip):
         return True
 
     # 使用正则表达式检查是否是有效的域名
-    domain_pattern = re.compile(r'^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$')
+    domain_pattern = re.compile(r"^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$")
     if domain_pattern.match(target_ip):
         return True
 
@@ -1474,7 +1434,7 @@ config_path: 配置文件的路径。
 
 def load_xray_config(config_path):
     try:
-        with open(config_path, 'r', encoding='utf-8') as file:
+        with open(config_path, "r", encoding="utf-8") as file:
             return json.load(file)
     except FileNotFoundError:
         logging.error(f"配置文件不存在: {config_path}")
@@ -1509,12 +1469,12 @@ def save_xray_config(xray_config, config_path):
     try:
         if config_path in (XRAY, XRAY_CHECK):
             # 如果文件路径是指定的路径，直接写入预定义的字符串
-            with open(config_path, 'w', encoding='utf-8') as file:
+            with open(config_path, "w", encoding="utf-8") as file:
                 file.write(xray_config)
                 logging.info(f"✅写入系统服务 {config_path} 成功")
         else:
             # 否则，使用 JSON 格式保存配置
-            with open(config_path, 'w', encoding='utf-8') as file:
+            with open(config_path, "w", encoding="utf-8") as file:
                 json.dump(xray_config, file, indent=4, ensure_ascii=False)
                 logging.info(f"✅写入 {config_path} 配置成功")
 
@@ -1546,8 +1506,10 @@ outbound_tag: 待检查的出站标签。
 
 
 def is_outbound_tag_exist(xray_config, outbound_tag):
-    return any(outbound.get("tag") == outbound_tag for outbound in xray_config.get('outbounds', []))
-
+    return any(
+        outbound.get("tag") == outbound_tag
+        for outbound in xray_config.get("outbounds", [])
+    )
 
 
 """
@@ -1573,11 +1535,11 @@ def restart_xray_service(service_name):
     if service_name == "xray":
         # 执行重启Xray服务的命令
         gateway_route_set()
-        subprocess.run(['systemctl', 'restart', service_name])
+        subprocess.run(["systemctl", "restart", service_name])
         logging.info(f"✅{service_name}服务重启成功")
 
     else:
-        subprocess.run(['systemctl', 'restart', service_name])
+        subprocess.run(["systemctl", "restart", service_name])
         logging.info(f"✅{service_name}服务重启成功")
 
 
@@ -1604,54 +1566,58 @@ protocol: 代理节点的协议类型，可以是 'vmess' 或 'socks5'。
 
 
 def create_node_handler(proxy_url, protocol):
-    if not proxy_url.lower().startswith(("ss://", "socks://", "vmess://", "vless://", "hysteria2://","trojan://")):
-        return 'ERROR'
+    if not proxy_url.lower().startswith(
+        ("ss://", "socks://", "vmess://", "vless://", "hysteria2://", "trojan://")
+    ):
+        return "ERROR"
 
     if protocol == "vmess":
         # 验证节点URL完整性并获取连接IP地址
         decoded_data = decode_vmess_link(proxy_url)
 
         if not decoded_data or "add" not in decoded_data:
-            logging.error(f'无效的{protocol}协议连接', 'error')
-            return redirect(url_for('create_node'))
+            logging.error(f"无效的{protocol}协议连接", "error")
+            return redirect(url_for("create_node"))
         # 提交数据保存至数据库
-        node_info_savedb(proxy_url, protocol, decoded_data.get("add"), decoded_data.get("ps"))
+        node_info_savedb(
+            proxy_url, protocol, decoded_data.get("add"), decoded_data.get("ps")
+        )
 
     elif protocol == "vless":
         decode_date = decode_vless_link(proxy_url)
-        access_ip = decode_date['ip']
+        access_ip = decode_date["ip"]
         node_info_savedb(proxy_url, protocol, access_ip)
 
     elif protocol == "socks":
         decoded_data = decode_socks_link(proxy_url)
-        access_ip = decoded_data.get('target_ip')
+        access_ip = decoded_data.get("target_ip")
         node_info_savedb(proxy_url, protocol, access_ip)
 
     elif protocol == "trojan":
         decoded_data = decode_trojan_link(proxy_url)
-        access_ip = decoded_data.get('server')
+        access_ip = decoded_data.get("server")
         node_info_savedb(proxy_url, protocol, access_ip)
 
     elif protocol == "shadowsocks":
         decoded_data = decode_shadowsocks_link(proxy_url)
-        access_ip = decoded_data.get('server')
+        access_ip = decoded_data.get("server")
         node_info_savedb(proxy_url, protocol, access_ip)
 
     elif protocol == "hysteria2":
         decode_data = decode_hysteria2_url(proxy_url)
-        server_address = decode_data.get('server')
+        server_address = decode_data.get("server")
         # 从 server 地址中提取 IP 地址
         access_ip = server_address.split(":")[0]
         node_info_savedb(proxy_url, protocol, access_ip)
 
-
-    elif protocol == 'subscribe':
+    elif protocol == "subscribe":
         subscribe_configs = parse_vmess_subscription(proxy_url)
         for subscribe_url in subscribe_configs:
             decoded_data = decode_vmess_link(subscribe_url)
             # 提交数据保存至数据库
-            node_info_savedb(subscribe_url, 'vmess', decoded_data.get("add"), decoded_data.get("ps"))
-
+            node_info_savedb(
+                subscribe_url, "vmess", decoded_data.get("add"), decoded_data.get("ps")
+            )
 
 
 """
@@ -1690,17 +1656,19 @@ def generate_tag():
     return tag
 
 
-def node_info_savedb(proxy_url, protocol, access_ip, note=''):
+def node_info_savedb(proxy_url, protocol, access_ip, note=""):
     # 查询数据库，判断是否已存在相同的 proxy_url
     existing_proxy = ProxyDevice.query.filter_by(proxy_url=proxy_url).first()
 
     if existing_proxy:
-        logging.info(f'代理{proxy_url} 重复添加!')
-        return redirect(url_for('create_node'))
+        logging.info(f"代理{proxy_url} 重复添加!")
+        return redirect(url_for("create_node"))
 
     # 提取POST的数据插入数据库
     tag = generate_tag()
-    proxy_rule = ProxyDevice(proxy_url=proxy_url, access_ip=access_ip, protocol=protocol, tag=tag, note=note)
+    proxy_rule = ProxyDevice(
+        proxy_url=proxy_url, access_ip=access_ip, protocol=protocol, tag=tag, note=note
+    )
     db.session.add(proxy_rule)
 
     try:
@@ -1737,11 +1705,11 @@ def generate_node_outbound(config, tag, protocol=None):
         json_config = generate_socks_config(config, tag)
     elif protocol == "vless":
         json_config = generate_vless_config(config, tag)
-    elif protocol == 'vmess':
+    elif protocol == "vmess":
         json_config = generate_vmess_config(config, tag)
-    elif protocol == 'trojan':
+    elif protocol == "trojan":
         json_config = generate_trojan_config(config, tag)
-    elif protocol == 'shadowsocks':
+    elif protocol == "shadowsocks":
         json_config = generate_shadowsocks_config(config, tag)
     else:
         create_and_run_hysteria2(config, tag)
@@ -1763,25 +1731,28 @@ Group=xray
 ExecStart=/usr/local/xos/xray/hysteria2 client -c {json_file_path}
 Restart=always
 RestartSec=5s
+LimitNOFILE=524288
+LimitNPROC=65535
 
 [Install]
 WantedBy=multi-user.target
 """
 
     service_file_path = f"/etc/systemd/system/{service_name}"
-    with open(service_file_path, 'w') as service_file:
+    with open(service_file_path, "w") as service_file:
         service_file.write(service_content)
 
     return service_name
 
+
 def create_and_run_hysteria2(json_config, tag):
     # 构建 JSON 文件路径
-    json_file_path = f'/etc/hysteria2/{tag}.json'
+    json_file_path = f"/etc/hysteria2/{tag}.json"
 
     # 写入 JSON 配置到文件
-    with open(json_file_path, 'w') as json_file:
+    with open(json_file_path, "w") as json_file:
         json.dump(json_config, json_file, indent=4, ensure_ascii=False)
-        logging.info(f'已创建配置文件: {json_file_path}')
+        logging.info(f"已创建配置文件: {json_file_path}")
 
     # # 使用 runuser 启动进程
     # command = f'runuser -l xray -c \'hysteria2 client -c {json_file_path} 2>/dev/null &\''
@@ -1791,7 +1762,7 @@ def create_and_run_hysteria2(json_config, tag):
     subprocess.run(["sudo", "systemctl", "daemon-reload"])
     subprocess.run(["sudo", "systemctl", "enable", service_name])
     subprocess.run(["sudo", "systemctl", "start", service_name])
-    logging.info(f'已启动 hysteria2 服务进程 ')
+    logging.info(f"已启动 hysteria2 服务进程 ")
 
 
 """
@@ -1820,33 +1791,25 @@ def generate_socks_config(config, tag):
         "settings": {
             "servers": [
                 {
-                    "address": config.get('target_ip', ''),
-                    "port": int(config.get('target_port', 0)),
+                    "address": config.get("target_ip", ""),
+                    "port": int(config.get("target_port", 0)),
                 }
             ]
         },
-        "streamSettings": {
-            "sockopt": {
-                "mark": 128,
-                "tcpFastOpen": True
-            }
-        }
+        "streamSettings": {"sockopt": {"mark": 128, "tcpFastOpen": True}},
     }
 
     # 判断是否存在账号密码
-    user = config.get('username', '')
-    password = config.get('password', '')
+    user = config.get("username", "")
+    password = config.get("password", "")
 
     if user and password:
         # 如果存在账号密码，添加到配置中
         json_config["settings"]["servers"][0]["users"] = [
-            {
-                "user": user,
-                "pass": password
-            }
+            {"user": user, "pass": password}
         ]
     # 判断是否为127.0.0.1，如果是则不包含 "mark": 128
-    if config.get('target_ip', '') == '127.0.0.1':
+    if config.get("target_ip", "") == "127.0.0.1":
         del json_config["streamSettings"]["sockopt"]["mark"]
 
     return json_config
@@ -1872,6 +1835,7 @@ tag: 节点的标签
 
 """
 
+
 def generate_vmess_config(config, tag):
     json_config = {
         "tag": f"{tag}",
@@ -1879,30 +1843,25 @@ def generate_vmess_config(config, tag):
         "settings": {
             "vnext": [
                 {
-                    "address": config.get('add', ''),
-                    "port": int(config.get('port', 0)),
+                    "address": config.get("add", ""),
+                    "port": int(config.get("port", 0)),
                     "users": [
-                        {
-                            "id": config.get('id', ''),
-                            "security": config.get('scy', '')
-                        }
-                    ]
+                        {"id": config.get("id", ""), "security": config.get("scy", "")}
+                    ],
                 }
             ]
         },
         "streamSettings": {
-            "network": config.get('net', ''),
-            "sockopt": {
-                "tcpFastOpen": True
-            }
-        }
+            "network": config.get("net", ""),
+            "sockopt": {"tcpFastOpen": True},
+        },
     }
 
     # 如果 address 是 "127.0.0.1"，则不包含 "mark" 字段
-    if config.get('add', '') != "127.0.0.1":
+    if config.get("add", "") != "127.0.0.1":
         json_config["streamSettings"]["sockopt"]["mark"] = 128
 
-    if config['net'] == "kcp":
+    if config["net"] == "kcp":
         json_config["streamSettings"]["kcpSettings"] = {
             "mtu": 1350,
             "tti": 50,
@@ -1912,18 +1871,16 @@ def generate_vmess_config(config, tag):
             "readBufferSize": 2,
             "writeBufferSize": 2,
             "header": {
-                "type": config.get('type', ''),
+                "type": config.get("type", ""),
                 "request": None,
-                "response": None
+                "response": None,
             },
-            "seed": config.get('path', '')
+            "seed": config.get("path", ""),
         }
-    elif config['net'] == "ws":
+    elif config["net"] == "ws":
         json_config["streamSettings"]["wsSettings"] = {
-            "path": config.get('path', ''),
-            "headers": {
-                "Host": config.get('host', '')
-            }
+            "path": config.get("path", ""),
+            "headers": {"Host": config.get("host", "")},
         }
 
     return json_config
@@ -1931,7 +1888,7 @@ def generate_vmess_config(config, tag):
 
 def generate_vless_config(config, tag):
     # 获取 email 和 security 的默认值
-    security = config.get('security', 'auto')
+    security = config.get("security", "auto")
 
     # 初始化基础的 JSON 配置
     json_config = {
@@ -1940,16 +1897,16 @@ def generate_vless_config(config, tag):
         "settings": {
             "vnext": [
                 {
-                    "address": config.get('ip', ''),
-                    "port": config.get('port', ''),
+                    "address": config.get("ip", ""),
+                    "port": config.get("port", ""),
                     "users": [
                         {
-                            "id": config.get('uuid', ''),
+                            "id": config.get("uuid", ""),
                             "encryption": "none",
-                            "flow": config.get('flow', ''),
-                            "security": security  # 使用 security 默认值
+                            "flow": config.get("flow", ""),
+                            "security": security,  # 使用 security 默认值
                         }
-                    ]
+                    ],
                 }
             ]
         },
@@ -1957,36 +1914,31 @@ def generate_vless_config(config, tag):
             "network": "tcp",  # 默认使用 TCP
             "security": "reality",
             "realitySettings": {
-                "serverName": config.get('sni', ''),
+                "serverName": config.get("sni", ""),
                 "fingerprint": "chrome",
                 "show": False,
-                "publicKey": config.get('pbk', ''),
-                "shortId": config.get('sid', ''),  # 设置 shortId
-                "spiderX": "/"  # 默认使用 "/"
+                "publicKey": config.get("pbk", ""),
+                "shortId": config.get("sid", ""),  # 设置 shortId
+                "spiderX": "/",  # 默认使用 "/"
             },
-            "sockopt": {
-                "mark": 128,
-                "tcpFastOpen": True
-            },
+            "sockopt": {"mark": 128, "tcpFastOpen": True},
         },
-        "mux": {
-            "enabled": False,
-            "concurrency": -1
-        }
+        "mux": {"enabled": False, "concurrency": -1},
     }
 
     # 根据 type 字段处理配置
-    if config.get('type', '') == 'xhttp':
+    if config.get("type", "") == "xhttp":
         json_config["streamSettings"]["network"] = "xhttp"
         json_config["streamSettings"]["xhttpSettings"] = {
-            "path": config.get('path', ''),
+            "path": config.get("path", ""),
         }
         # 如果有 spx 字段，则加入 spx 配置
-        if 'spx' in config:
-            json_config["streamSettings"]["realitySettings"]["spiderX"] = config.get('spx', '/')
+        if "spx" in config:
+            json_config["streamSettings"]["realitySettings"]["spiderX"] = config.get(
+                "spx", "/"
+            )
 
     return json_config
-
 
 
 def generate_shadowsocks_config(ss_config, tag):
@@ -2000,23 +1952,16 @@ def generate_shadowsocks_config(ss_config, tag):
                     "method": ss_config["method"],
                     "password": ss_config["password"],
                     "port": ss_config["port"],
-                    "uot": True
+                    "uot": True,
                 }
             ]
         },
         "streamSettings": {
-        "network": "tcp",
-        "security": "none",
-        "tcpSettings": {
-          "header": {
-            "type": "none"
-          }
+            "network": "tcp",
+            "security": "none",
+            "tcpSettings": {"header": {"type": "none"}},
+            "sockopt": {"mark": 128, "tcpFastOpen": True},
         },
-        "sockopt": {
-                "mark": 128,
-                "tcpFastOpen": True
-            },
-      }
     }
     return json_config
 
@@ -2028,12 +1973,12 @@ def generate_trojan_config(trojan_json, tag):
         "settings": {
             "servers": [
                 {
-                    "address": trojan_json.get('server', ''),
+                    "address": trojan_json.get("server", ""),
                     "method": "chacha20",
                     "ota": False,  # Trojans does not use OTA by default
-                    "password": trojan_json.get('password', ''),
-                    "port": trojan_json.get(('port'), ''),
-                    "level": 1  # Level can be set as needed
+                    "password": trojan_json.get("password", ""),
+                    "port": trojan_json.get(("port"), ""),
+                    "level": 1,  # Level can be set as needed
                 }
             ]
         },
@@ -2043,24 +1988,18 @@ def generate_trojan_config(trojan_json, tag):
             "tlsSettings": {
                 "allowInsecure": False,  # You may adjust this based on your needs
                 # 只在alpn存在且不为空字符串时保留alpn键
-                **({"alpn": [trojan_json['alpn']]} if trojan_json.get('alpn') else {}),
+                **({"alpn": [trojan_json["alpn"]]} if trojan_json.get("alpn") else {}),
                 "fingerprint": "",  # You may set fingerprint if required
-                "show": False
+                "show": False,
             },
-            "sockopt": {
-                "mark": 128,
-                "tcpFastOpen": True
-            },
+            "sockopt": {"mark": 128, "tcpFastOpen": True},
         },
-        "mux": {
-            "enabled": False,
-            "concurrency": -1
-        }
+        "mux": {"enabled": False, "concurrency": -1},
     }
     return json_config
 
 
-def generate_hysteria2_config(tag, filename=''):
+def generate_hysteria2_config(tag, filename=""):
     # 构建配置文件路径
     config_file_path = f"{HYSTERIA2_FOLDER}{filename}.json"
     config = load_xray_config(config_file_path)
@@ -2072,7 +2011,7 @@ def generate_hysteria2_config(tag, filename=''):
 
         # 从 listen 地址中提取端口号
         port = int(listen_address.split(":")[-1])
-        server = '127.0.0.1'
+        server = "127.0.0.1"
 
         # hysteria2特殊配置
         json_config = {
@@ -2086,11 +2025,7 @@ def generate_hysteria2_config(tag, filename=''):
                     }
                 ]
             },
-            "streamSettings": {
-                "sockopt": {
-                    "tcpFastOpen": True
-                }
-            }
+            "streamSettings": {"sockopt": {"tcpFastOpen": True}},
         }
         return json_config
     except Exception as e:
@@ -2180,10 +2115,10 @@ def decode_proxy_link(proxy_url):
             return decode_hysteria2_url(proxy_url), "hysteria2"
         else:
             logging.warning("不支持的协议")
-            return None,None
+            return None, None
     except Exception as e:
         logging.error(f"解码连接时发生错误: {e}")
-        return None,None
+        return None, None
 
 
 """
@@ -2211,32 +2146,32 @@ access_ip: 要添加到路由规则的 IP 地址或域名。
 
 def xray_node_route_add(xray_config, decode_data, protocol):
     # vmess协议
-    if protocol == 'vmess':
-        access_ip = decode_data.get('add')
-        port = decode_data.get('port')
+    if protocol == "vmess":
+        access_ip = decode_data.get("add")
+        port = decode_data.get("port")
 
     # socks协议
-    elif protocol == 'socks':
-        access_ip = decode_data.get('target_ip')
-        port = decode_data.get('target_port')
+    elif protocol == "socks":
+        access_ip = decode_data.get("target_ip")
+        port = decode_data.get("target_port")
 
     # shadowsocks协议
-    elif protocol == 'shadowsocks':
-        access_ip = decode_data.get('server')
-        port = decode_data.get('port')
+    elif protocol == "shadowsocks":
+        access_ip = decode_data.get("server")
+        port = decode_data.get("port")
 
     # vless协议
-    elif protocol == 'vless':
-        access_ip = decode_data.get('ip')
-        port = decode_data.get('port')
+    elif protocol == "vless":
+        access_ip = decode_data.get("ip")
+        port = decode_data.get("port")
 
     # trojan,shadowsocks协议
-    elif protocol == 'trojan':
-        access_ip = decode_data.get('server')
-        port = decode_data.get('port')
+    elif protocol == "trojan":
+        access_ip = decode_data.get("server")
+        port = decode_data.get("port")
 
     # hy2协议特殊无需路由
-    elif protocol == 'hysteria2':
+    elif protocol == "hysteria2":
         logging.info("hysteria2 xray路由添加跳过")
         return
 
@@ -2244,9 +2179,21 @@ def xray_node_route_add(xray_config, decode_data, protocol):
     existing_rules = xray_config["routing"].get("rules", [])
 
     # 检查该 IP、域名和端口是否已存在于任何规则中
-    existing_rule = next((rule for rule in existing_rules if
-                          (access_ip in rule.get("domain", []) and int(port) == int(rule.get("port", 0))) or
-                          (access_ip in rule.get("ip", []) and int(port) == int(rule.get("port", 0)))), None)
+    existing_rule = next(
+        (
+            rule
+            for rule in existing_rules
+            if (
+                access_ip in rule.get("domain", [])
+                and int(port) == int(rule.get("port", 0))
+            )
+            or (
+                access_ip in rule.get("ip", [])
+                and int(port) == int(rule.get("port", 0))
+            )
+        ),
+        None,
+    )
 
     if access_ip == "127.0.0.1":
         logging.info(f"✅跳过 127.0.0.1 的路由规则: {access_ip}:{port}")
@@ -2254,9 +2201,19 @@ def xray_node_route_add(xray_config, decode_data, protocol):
         if not existing_rule:
             # 判断 access_ip 是域名还是IP地址
             if is_ip_address(access_ip):
-                new_rule = {"type": "field", "outboundTag": "direct", "ip": [access_ip], "port": port}
+                new_rule = {
+                    "type": "field",
+                    "outboundTag": "direct",
+                    "ip": [access_ip],
+                    "port": port,
+                }
             else:
-                new_rule = {"type": "field", "outboundTag": "direct", "domain": [access_ip], "port": port}
+                new_rule = {
+                    "type": "field",
+                    "outboundTag": "direct",
+                    "domain": [access_ip],
+                    "port": port,
+                }
 
             xray_config["routing"].setdefault("rules", []).insert(0, new_rule)
         else:
@@ -2296,7 +2253,7 @@ config_path: Xray 配置文件的路径，默认为 CONFIG_PATH。
 """
 
 
-def xray_node_outbound_remove(tag, hostname='', config_path=CONFIG_PATH):
+def xray_node_outbound_remove(tag, hostname="", config_path=CONFIG_PATH):
     # 读取现有配置
     xray_config = load_xray_config(config_path)
 
@@ -2304,7 +2261,11 @@ def xray_node_outbound_remove(tag, hostname='', config_path=CONFIG_PATH):
         return "Xray Error"
 
     # 移除出站配置
-    xray_config["outbounds"] = [outbound for outbound in xray_config.get("outbounds", []) if outbound.get("tag") != tag]
+    xray_config["outbounds"] = [
+        outbound
+        for outbound in xray_config.get("outbounds", [])
+        if outbound.get("tag") != tag
+    ]
 
     # 移除出站DNS配置
     if hostname:
@@ -2340,6 +2301,7 @@ config_path: Xray 配置文件的路径，默认为 CONFIG_PATH。
 
 """
 
+
 def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
     decode_data, protocol = decode_proxy_link(proxy_url)
 
@@ -2349,12 +2311,12 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
         port = decode_data.get("target_port")
 
     elif protocol == "vmess":
-        access_ip = decode_data.get('add')
-        port = decode_data.get('port')
+        access_ip = decode_data.get("add")
+        port = decode_data.get("port")
 
     elif protocol == "vless":
-        access_ip = decode_data.get('ip')
-        port = decode_data.get('port')
+        access_ip = decode_data.get("ip")
+        port = decode_data.get("port")
 
     elif protocol == "trojan":
         access_ip = decode_data.get("server")
@@ -2365,6 +2327,7 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
         port = decode_data.get("port")
 
     else:
+
         def extract_socks5_port(decode_data):
             directory = "/etc/hysteria2"
             target_server = decode_data.get("server")
@@ -2383,7 +2346,7 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
                                 return int(port)
             return None
 
-        access_ip = '127.0.0.1'
+        access_ip = "127.0.0.1"
         port = extract_socks5_port(decode_data)
 
     # 转换端口为整数类型
@@ -2402,8 +2365,10 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
     def ip_match(ip, rule_ips):
         for item in rule_ips:
             try:
-                if '/' in item:
-                    if ipaddress.ip_address(ip) in ipaddress.ip_network(item, strict=False):
+                if "/" in item:
+                    if ipaddress.ip_address(ip) in ipaddress.ip_network(
+                        item, strict=False
+                    ):
                         return True
                 elif ip == item:
                     return True
@@ -2418,14 +2383,16 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
         rule_port = rule.get("port")
 
         ip_matched = ip_match(access_ip, rule_ips)
-        port_matched = (rule_port == port)
+        port_matched = rule_port == port
 
         # Debug 输出
-        logging.debug(f"[检查规则] IPs: {rule_ips}, Port: {rule_port} => IP匹配: {ip_matched}, 端口匹配: {port_matched}")
+        logging.debug(
+            f"[检查规则] IPs: {rule_ips}, Port: {rule_port} => IP匹配: {ip_matched}, 端口匹配: {port_matched}"
+        )
 
         if ip_matched and port_matched:
-            rule['ip'] = [ip for ip in rule_ips if ip != access_ip]
-            if not rule['ip']:
+            rule["ip"] = [ip for ip in rule_ips if ip != access_ip]
+            if not rule["ip"]:
                 logging.info(f"✅已清除规则: {rule}")
                 continue  # 整个规则 IP 为空时不保留
             else:
@@ -2443,7 +2410,8 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
     else:
         logging.error("❌ Xray 配置保存失败")
 
-'''
+
+"""
  get_device_addresses 函数的功能描述如下：
 
 get_device_addresses 函数用于解析原始文本并验证设备IP地址。函数接受一个参数：
@@ -2456,12 +2424,14 @@ raw_text: 包含设备IP地址的原始文本。
 如果验证出错，返回包含错误消息的元组 (None, error_message)。
 如果验证成功，去掉列表中的重复IP地址，生成一个不含重复IP地址的列表，返回 (unique_ip_addresses, None)。
    
-'''
+"""
 
 
 def get_device_addresses(raw_text):
     try:
-        ip_addresses = [ip.strip() for ip in raw_text.replace('\n', ',').split(',') if ip.strip()]
+        ip_addresses = [
+            ip.strip() for ip in raw_text.replace("\n", ",").split(",") if ip.strip()
+        ]
 
         # 验证IP地址
         error_message = validate_device_addresses(ip_addresses)
@@ -2499,10 +2469,10 @@ def validate_device_addresses(ip_addresses):
             try:
                 ip_network = ipaddress.ip_network(ip, strict=False)
                 # 记录成功的验证
-                logging.info(f'有效的IP地址: {ip}')
+                logging.info(f"有效的IP地址: {ip}")
             except ValueError:
-                logging.error(f'无效的IP地址: {ip}')
-                return f'无效的IP地址: {ip}'
+                logging.error(f"无效的IP地址: {ip}")
+                return f"无效的IP地址: {ip}"
         return None
     except Exception as e:
         logging.exception(f"验证IP地址时发生错误: {str(e)}")
@@ -2525,7 +2495,7 @@ tag: 出站标签，用于识别设备的出站配置。
 def generate_device_route(ip_string, tag):
     if ip_string:
         # 如果 ip_string 存在，将其分割成 IP 地址列表
-        ip_list = [ip.strip() for ip in ip_string.split(',')]
+        ip_list = [ip.strip() for ip in ip_string.split(",")]
         route_config = {
             "type": "field",
             "source": ip_list,
@@ -2557,38 +2527,44 @@ config_path: Xray配置文件路径，默认为全局变量 CONFIG_PATH。
 def xray_route_rule(route_dict, match_type, config_path=CONFIG_PATH):
     # 读取现有配置
     xray_config = load_xray_config(config_path)
-    outbound_tag = route_dict.get('outboundTag')
+    outbound_tag = route_dict.get("outboundTag")
 
     # 根据 match_type 确定获取的键名
-    target_key = match_type if match_type in ('ip', 'source') else 'ip'
+    target_key = match_type if match_type in ("ip", "source") else "ip"
 
     # 获取所有的键值
     selected_target_ips = route_dict.get(target_key, [])
 
     # 检查是否已存在相同的 type、match_type 和 outboundTag 组合
-    existing_rules = xray_config.get('routing', {}).get('rules', [])
+    existing_rules = xray_config.get("routing", {}).get("rules", [])
 
     for existing_rule in existing_rules:
         if (
-            existing_rule.get('type') == 'field'
+            existing_rule.get("type") == "field"
             and existing_rule.get(match_type)
-            and existing_rule.get('outboundTag') == outbound_tag
+            and existing_rule.get("outboundTag") == outbound_tag
         ):
             # 更新规则
             existing_rule.update(route_dict)
-            logging.info(f"✅更新源为：{existing_rule.get(match_type)}，出站标签为：{outbound_tag} 的规则")
+            logging.info(
+                f"✅更新源为：{existing_rule.get(match_type)}，出站标签为：{outbound_tag} 的规则"
+            )
             break
     else:
         # 如果不存在则添加新的路由规则
-        routing_rules = xray_config.setdefault('routing', {}).setdefault('rules', [])
+        routing_rules = xray_config.setdefault("routing", {}).setdefault("rules", [])
         routing_rules.insert(-2, route_dict)
-        logging.info(f"✅添加新规则，源为：{route_dict.get(match_type)}，出站标签为：{outbound_tag}。操作成功。")
+        logging.info(
+            f"✅添加新规则，源为：{route_dict.get(match_type)}，出站标签为：{outbound_tag}。操作成功。"
+        )
 
     # 复制现有规则以进行安全迭代
     for existing_rule in existing_rules.copy():
         # 移除相同的IP值，但是出站标签不等于当前出站标签的情况下
         for address in selected_target_ips:
-            if existing_rule.get('outboundTag') != outbound_tag and address in existing_rule.get(match_type, []):
+            if existing_rule.get(
+                "outboundTag"
+            ) != outbound_tag and address in existing_rule.get(match_type, []):
                 existing_rule[match_type].remove(address)
                 # 如果 match_type 对应的值为空了，则移除整个规则
                 if not existing_rule.get(match_type):
@@ -2600,7 +2576,6 @@ def xray_route_rule(route_dict, match_type, config_path=CONFIG_PATH):
         return 1
     else:
         return "Xray 错误"
-
 
 
 """
@@ -2624,11 +2599,14 @@ def xray_route_remove(tag, match_type, config_path=CONFIG_PATH):
     xray_config = load_xray_config(config_path)
 
     # 删除使用这个出站的路由规则
-    routing_rules = xray_config.get('routing', {}).get('rules', [])
-    updated_routing_rules = [rule for rule in routing_rules if
-                             not (rule.get('outboundTag') == tag and match_type in rule)]
+    routing_rules = xray_config.get("routing", {}).get("rules", [])
+    updated_routing_rules = [
+        rule
+        for rule in routing_rules
+        if not (rule.get("outboundTag") == tag and match_type in rule)
+    ]
 
-    xray_config['routing']['rules'] = updated_routing_rules
+    xray_config["routing"]["rules"] = updated_routing_rules
 
     # 保存更新后的配置
     if save_xray_config(xray_config, config_path):
@@ -2669,17 +2647,17 @@ def xray_device_route_handler(proxys, raw_text):
         # 如果记录的device_ip字段不为空，则进行处理
         if proxy.device_ip:
             # 将记录的device_ip字段中的值按逗号分隔为列表
-            device_ips = proxy.device_ip.split(',')
+            device_ips = proxy.device_ip.split(",")
             # 移除匹配到的IP地址
             updated_ips = [ip for ip in device_ips if ip not in ip_addresses]
             # 更新device_ip字段为移除匹配到的IP地址后的值
-            proxy.device_ip = ','.join(updated_ips) if updated_ips else None
+            proxy.device_ip = ",".join(updated_ips) if updated_ips else None
 
     # 提交更改到数据库
     db.session.commit()
 
     # 更新数据库
-    proxys.device_ip = ','.join(ip_addresses) or None
+    proxys.device_ip = ",".join(ip_addresses) or None
     db.session.commit()
 
     # 重新获取数据库中最新的 device_ip 和 tag 值
@@ -2695,21 +2673,24 @@ def xray_device_route_handler(proxys, raw_text):
     else:
         logging.error(f"添加设备路由规则失败：{device_ip}-出站路由：{tag}")
 
-    return {'success': True, 'message': 'IP地址更新成功'}
+    return {"success": True, "message": "IP地址更新成功"}
+
 
 def excel_import_device_route_handler():
     # 打开 JSON 文件并加载数据
     xray_config = load_xray_config(CONFIG_PATH)
-    rules = xray_config.get('routing', {}).get('rules', [])
+    rules = xray_config.get("routing", {}).get("rules", [])
 
     # 过滤出同时满足条件的规则并移除
-    filtered_rules = [rule for rule in rules if rule.get('type') == 'field' and 'source' in rule]
+    filtered_rules = [
+        rule for rule in rules if rule.get("type") == "field" and "source" in rule
+    ]
     for rule in filtered_rules:
         rules.remove(rule)
 
     # 更新出站绑定设备IP规则
-    xray_config['routing']['rules'] = rules
-    save_xray_config(xray_config,CONFIG_PATH)
+    xray_config["routing"]["rules"] = rules
+    save_xray_config(xray_config, CONFIG_PATH)
 
     # 查询条件：device_ip 不为空的记录
     proxies_with_ip = ProxyDevice.query.filter(ProxyDevice.device_ip != None).all()
@@ -2754,26 +2735,13 @@ def generate_test_config(protocol, proxy_url, tag, port):
         "tag": f"{tag}",
         "port": port,
         "protocol": "socks",
-        "settings": {
-            "auth": "noauth",
-            "udp": True
-        },
+        "settings": {"auth": "noauth", "udp": True},
         "streamSettings": {
             "network": "tcp",
             "security": "none",
-            "tcpSettings": {
-                "header": {
-                    "type": "none"
-                }
-            }
+            "tcpSettings": {"header": {"type": "none"}},
         },
-        "sniffing": {
-            "enabled": True,
-            "destOverride": [
-                "http",
-                "tls"
-            ]
-        }
+        "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
     }
 
     routing = {
@@ -2785,9 +2753,10 @@ def generate_test_config(protocol, proxy_url, tag, port):
     decode_data, protocol = decode_proxy_link(proxy_url)
     if decode_data:
         # 生成节点配置
-        if protocol == 'hysteria2':
-
-            hysteria2_filename = ProxyDevice.query.filter_by(proxy_url=proxy_url).first().tag
+        if protocol == "hysteria2":
+            hysteria2_filename = (
+                ProxyDevice.query.filter_by(proxy_url=proxy_url).first().tag
+            )
             # hysteria2 节点TAG做文件名参数
             outbound = generate_hysteria2_config(tag, hysteria2_filename)
 
@@ -2805,7 +2774,13 @@ def multi_process_test(result):
     process = []
     for id, port in result.items():
         # 并发多线程实现快速检测服务
-        t = Thread(target=port_test, args=(id, port,))
+        t = Thread(
+            target=port_test,
+            args=(
+                id,
+                port,
+            ),
+        )
         t.start()
         process.append(t)
 
@@ -2827,9 +2802,19 @@ def multi_process_test(result):
 
 
 def port_test(proxies_id, port):
-    test1 = "curl -s --connect-timeout 3 -m 3 -x socks5h://127.0.0.1:{0} ipinfo.io".format(port)
-    test2 = "curl -s --connect-timeout 3 -m 3 -x socks5h://127.0.0.1:{0} ip-api.com".format(port)
-    test3 = "curl -s --connect-timeout 3 -m 3 -x socks5h://127.0.0.1:{0} ifconfig.me".format(port)
+    test1 = (
+        "curl -s --connect-timeout 3 -m 3 -x socks5h://127.0.0.1:{0} ipinfo.io".format(
+            port
+        )
+    )
+    test2 = (
+        "curl -s --connect-timeout 3 -m 3 -x socks5h://127.0.0.1:{0} ip-api.com".format(
+            port
+        )
+    )
+    test3 = "curl -s --connect-timeout 3 -m 3 -x socks5h://127.0.0.1:{0} ifconfig.me".format(
+        port
+    )
     test1_result = subprocess.getstatusoutput(test1)
     test2_result = subprocess.getstatusoutput(test2)
     test3_result = subprocess.getstatusoutput(test3)
@@ -2848,13 +2833,7 @@ def port_test(proxies_id, port):
 
 
 def xray_proxies_info_handler(selected_items):
-    xray_config = {
-        "inbounds": [],
-        "outbounds": [],
-        "routing": {
-            "rules": []
-        }
-    }
+    xray_config = {"inbounds": [], "outbounds": [], "routing": {"rules": []}}
 
     result = {}
     global test_result
@@ -2875,7 +2854,9 @@ def xray_proxies_info_handler(selected_items):
         tag = proxies.tag
         # 添加代理条件ID和测试端口对应关系
         result[proxies_id] = port
-        inbound, outbound, routing = generate_test_config(protocol, proxies_url, tag, port)
+        inbound, outbound, routing = generate_test_config(
+            protocol, proxies_url, tag, port
+        )
 
         if inbound and outbound and routing:
             xray_config["inbounds"].append(inbound)
@@ -2887,36 +2868,37 @@ def xray_proxies_info_handler(selected_items):
 
     # 保存配置
     save_xray_config(xray_config, CHECK_PATH)
-    restart_xray_service('xray-check')
+    restart_xray_service("xray-check")
     time.sleep(1)
     # 调用多进程检测程序
     test_result = multi_process_test(result)
     for proxies_id, result in test_result.items():
         proxies = ProxyDevice.query.filter_by(id=proxies_id).first()
-        if result == 'Inactive':
-            proxies.status = 'Inactive'
+        if result == "Inactive":
+            proxies.status = "Inactive"
         else:
             # 使用正则表达式去除 ANSI 转义序列
-            result = re.sub(r'\x1b\[[0-9;]*m', '', result)
+            result = re.sub(r"\x1b\[[0-9;]*m", "", result)
             # 尝试解析JSON结果
             try:
                 ip_info = json.loads(result, strict=False)
-                if ip_info.get('ip'):
-                    proxies.node_ip = ip_info.get('ip', '')
-                    proxies.country = ip_info.get('country', '')
-                    proxies.status = 'Active'  # 更新status为'active'
-                elif ip_info.get('query'):
-                    proxies.node_ip = ip_info.get('query', '')
-                    proxies.country = ip_info.get('country', '')
-                    proxies.status = 'Active'  # 更新status为'active'
+                if ip_info.get("ip"):
+                    proxies.node_ip = ip_info.get("ip", "")
+                    proxies.country = ip_info.get("country", "")
+                    proxies.status = "Active"  # 更新status为'active'
+                elif ip_info.get("query"):
+                    proxies.node_ip = ip_info.get("query", "")
+                    proxies.country = ip_info.get("country", "")
+                    proxies.status = "Active"  # 更新status为'active'
             except json.JSONDecodeError as e:
                 proxies.node_ip = result
-                proxies.status = 'Active'
+                proxies.status = "Active"
 
         db.session.commit()
 
     # 执行关闭 xray-check 服务的命令
-    os.system('sudo systemctl stop xray-check')
+    os.system("sudo systemctl stop xray-check")
+
 
 """
 
@@ -2957,7 +2939,7 @@ def xray_node_delete_handler(proxy_device):
         xray_route_remove(tag, "ip")
         xray_node_route_remove(proxy_url)
 
-        if protocol == 'hysteria2':
+        if protocol == "hysteria2":
             uninstall_hysteria2_service(tag)
 
         # 删除数据库记录
@@ -2988,7 +2970,7 @@ check_relay_rules 函数用于验证中继规则的格式和有效性。该函�
 
 def check_relay_rules(rules):
     rules_list = rules.splitlines()
-    rule_pattern = re.compile(r'^(tcp|udp):(\d{1,5}):(\d+\.\d+\.\d+\.\d+):(\d{1,5})$')
+    rule_pattern = re.compile(r"^(tcp|udp):(\d{1,5}):(\d+\.\d+\.\d+\.\d+):(\d{1,5})$")
     validated_rules = []
 
     # 逐一验证每条规则
@@ -3004,19 +2986,23 @@ def check_relay_rules(rules):
             target_ip = match.group(3)
             target_port = int(match.group(4))
 
-            if (protocol.lower() not in ['tcp', 'udp'] or
-                    not (0 <= source_port <= 65535) or
-                    not (0 <= target_port <= 65535) or
-                    not is_ip_address(target_ip)):
+            if (
+                protocol.lower() not in ["tcp", "udp"]
+                or not (0 <= source_port <= 65535)
+                or not (0 <= target_port <= 65535)
+                or not is_ip_address(target_ip)
+            ):
                 logging.error("规则 {} 的格式无效".format(rule))
                 return False, "规则 {} 的格式无效".format(rule)
             else:
-                validated_rules.append({
-                    'protocol': protocol,
-                    'source_port': source_port,
-                    'target_ip': target_ip,
-                    'target_port': target_port
-                })
+                validated_rules.append(
+                    {
+                        "protocol": protocol,
+                        "source_port": source_port,
+                        "target_ip": target_ip,
+                        "target_port": target_port,
+                    }
+                )
         else:
             logging.error("规则 {} 的格式无效".format(rule))
             return False, "规则 {} 的格式无效".format(rule)
@@ -3043,17 +3029,17 @@ relay_info_savedb 函数用于保存中继规则信息到数据库。函数接�
 
 def relay_info_savedb(validated_rules):
     for rule_info in validated_rules:
-        protocol = rule_info['protocol']
-        source_port = rule_info['source_port']
-        target_ip = rule_info['target_ip']
-        target_port = rule_info['target_port']
+        protocol = rule_info["protocol"]
+        source_port = rule_info["source_port"]
+        target_ip = rule_info["target_ip"]
+        target_port = rule_info["target_port"]
 
         # 检查数据库中是否已存在相同的规则
         existing_rule = RelayConnection.query.filter_by(
             protocol=protocol,
             source_port=source_port,
             target_ip=target_ip,
-            target_port=target_port
+            target_port=target_port,
         ).first()
 
         if existing_rule:
@@ -3095,19 +3081,20 @@ process_single_relay 函数用于处理单个中转连接规则的执行操作�
 
 def process_single_relay(relay_connection, exec_type):
     try:
-        if exec_type == 'delete':
+        if exec_type == "delete":
             socat_process_kill(relay_connection)
             db.session.delete(relay_connection)
-        elif exec_type == 'on':
+        elif exec_type == "on":
             relay_connection_on(relay_connection)
             relay_connection.status = 1
-        elif exec_type == 'off':
+        elif exec_type == "off":
             socat_process_kill(relay_connection)
             relay_connection.status = 0
 
         db.session.commit()
         logging.info(
-            f"执行中转 {relay_connection.target_ip}:{relay_connection.target_port}:，执行类型: {exec_type} 成功！")
+            f"执行中转 {relay_connection.target_ip}:{relay_connection.target_port}:，执行类型: {exec_type} 成功！"
+        )
 
     except Exception as e:
         logging.error(f"中转 {relay_connection.target_ip} 出错，执行类型 {exec_type}: {str(e)}")
@@ -3179,29 +3166,35 @@ def relay_connection_on(relay_connection):
     target_port = relay_connection.target_port
     protocol = relay_connection.protocol.lower()
 
-    if protocol == 'udp':
+    if protocol == "udp":
         cmd = [
-            'socat',
-            '-T', '30',
-            '-d',
-            f'UDP4-LISTEN:{source_port},reuseaddr,fork',
-            f'UDP4:{target_ip}:{target_port}'
+            "socat",
+            "-T",
+            "30",
+            "-d",
+            f"UDP4-LISTEN:{source_port},reuseaddr,fork",
+            f"UDP4:{target_ip}:{target_port}",
         ]
     else:
         cmd = [
-            'socat',
-            '-d',
-            f'TCP4-LISTEN:{source_port},reuseaddr,fork',
-            f'TCP4:{target_ip}:{target_port}'
+            "socat",
+            "-d",
+            f"TCP4-LISTEN:{source_port},reuseaddr,fork",
+            f"TCP4:{target_ip}:{target_port}",
         ]
 
     try:
-        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, preexec_fn=os.setsid)
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            preexec_fn=os.setsid,
+        )
 
-        if protocol == 'udp':
+        if protocol == "udp":
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.settimeout(1)
-                s.sendto(b'', (target_ip, target_port))
+                s.sendto(b"", (target_ip, target_port))
         else:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(1)
@@ -3239,10 +3232,13 @@ selected_target_ips: 一个包含选定的目标 IP 地址的列表。
 
 
 def relay_ip_route_set(tag, selected_target_ips):
-    RelayConnection.query.filter_by(tag=tag).update({RelayConnection.tag: None}, synchronize_session='fetch')
+    RelayConnection.query.filter_by(tag=tag).update(
+        {RelayConnection.tag: None}, synchronize_session="fetch"
+    )
     # 更新数据库中选定的 IP 的 tag 字段为指定的 tag
-    RelayConnection.query.filter(RelayConnection.target_ip.in_(selected_target_ips)).update(
-        {RelayConnection.tag: tag}, synchronize_session='fetch')
+    RelayConnection.query.filter(
+        RelayConnection.target_ip.in_(selected_target_ips)
+    ).update({RelayConnection.tag: tag}, synchronize_session="fetch")
     db.session.commit()
 
     if selected_target_ips:
@@ -3263,7 +3259,7 @@ def relay_ip_route_set(tag, selected_target_ips):
 
 def set_proxy_chain(get_tag, post_tag):
     try:
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             config = json.load(f)
     except Exception as e:
         logging.error(f"配置读取失败: {e}")
@@ -3276,9 +3272,7 @@ def set_proxy_chain(get_tag, post_tag):
             for k, v in outbound.items():
                 if k != "proxySettings":
                     new_outbound[k] = v
-            new_outbound["proxySettings"] = {
-                "tag": post_tag
-            }
+            new_outbound["proxySettings"] = {"tag": post_tag}
             config["outbounds"][i] = new_outbound
             found = True
             break
@@ -3288,7 +3282,7 @@ def set_proxy_chain(get_tag, post_tag):
         return
 
     try:
-        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
         logging.info(f"✅成功设置 proxySettings: {get_tag} -> {post_tag}")
     except Exception as e:
@@ -3297,7 +3291,7 @@ def set_proxy_chain(get_tag, post_tag):
 
 def clear_proxy_chain(tag):
     try:
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             config = json.load(f)
     except Exception as e:
         logging.error(f"配置读取失败: {e}")
@@ -3316,7 +3310,7 @@ def clear_proxy_chain(tag):
         return
 
     try:
-        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
         logging.info(f"✅成功移除 {tag} 的 proxySettings")
     except Exception as e:

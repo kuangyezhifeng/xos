@@ -293,8 +293,6 @@ def generate_conversions(inbound_protocol, outbound_protocol, proxys):
         elif inbound_protocol == "vmess" and proxy:
             port = generate_random_port()
             vmess_uuid = generate_random_id()
-
-            """Generate Vmess-KCP connection string."""
             config = {
                 "v": "2",
                 "ps": "",
@@ -302,10 +300,10 @@ def generate_conversions(inbound_protocol, outbound_protocol, proxys):
                 "port": port,
                 "id": vmess_uuid,
                 "aid": 64,
-                "net": "kcp",
-                "type": "wechat-video",
+                "net": "tcp",
+                "type": "none",
                 "host": "",
-                "path": "VA1vFM7DZn",
+                "path": "",
                 "tls": ""
             }
             config_json = json.dumps(config)
