@@ -2802,34 +2802,46 @@ def multi_process_test(result):
 
 
 def port_test(proxies_id, port):
-    test1 = (
-        "curl -s --connect-timeout 3 -m 3 -x socks5h://127.0.0.1:{0} ipinfo.io".format(
-            port
-        )
-    )
-    test2 = (
-        "curl -s --connect-timeout 3 -m 3 -x socks5h://127.0.0.1:{0} ip-api.com".format(
-            port
-        )
-    )
-    test3 = "curl -s --connect-timeout 3 -m 3 -x socks5h://127.0.0.1:{0} ifconfig.me".format(
-        port
-    )
-    test1_result = subprocess.getstatusoutput(test1)
-    test2_result = subprocess.getstatusoutput(test2)
-    test3_result = subprocess.getstatusoutput(test3)
+    cmds = [
+        (
+            "ipinfo",
+            f'curl -s -w "HTTP_CODE:%{{http_code}}" --connect-timeout 3 -m 3 '
+            f'-x socks5h://127.0.0.1:{port} https://ipinfo.io'
+        ),
+        (
+            "ip-api",
+            f'curl -s -w "HTTP_CODE:%{{http_code}}" --connect-timeout 3 -m 3 '
+            f'-x socks5h://127.0.0.1:{port} http://ip-api.com/json'
+        ),
+        (
+            "ifconfig",
+            f'curl -s -w "HTTP_CODE:%{{http_code}}" --connect-timeout 3 -m 3 '
+            f'-x socks5h://127.0.0.1:{port} https://ifconfig.me'
+        ),
+    ]
 
-    if test1_result[0] == 0:
-        test_result[proxies_id] = test1_result[1]
-        logging.info(f"✅代理ID{proxies_id} INFOIO测试结果: {test1_result[1]}")
-    elif test2_result[0] == 0:
-        test_result[proxies_id] = test2_result[1]
-        logging.info(f"✅代理ID{proxies_id} IP-API测试结果: {test2_result[1]}")
-    elif test3_result[0] == 0:
-        test_result[proxies_id] = test3_result[1]
-        logging.info(f"✅代理ID{proxies_id}IFCONFIG.ME测试结果: {test3_result[1]}")
-    else:
-        test_result[proxies_id] = "Inactive"
+    for name, cmd in cmds:
+        code, output = subprocess.getstatusoutput(cmd)
+        if code != 0:
+            continue
+
+        if "HTTP_CODE:" not in output:
+            continue
+
+        body, http_code = output.rsplit("HTTP_CODE:", 1)
+
+        if http_code != "200":
+            logging.warning(
+                f"⚠️代理ID{proxies_id} {name} HTTP {http_code}，尝试下一个"
+            )
+            continue
+
+        body = body.strip()
+        test_result[proxies_id] = body
+        logging.info(f"✅代理ID{proxies_id} {name} 测试成功: {body}")
+        return
+
+    test_result[proxies_id] = "Inactive"
 
 
 def xray_proxies_info_handler(selected_items):
