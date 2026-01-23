@@ -228,22 +228,31 @@ def error():
 @login_required
 def system():
     exec_type = request.args.get('exec_type')
-    # Mapping of exec_types to functions
+
+    if not exec_type:
+        return redirect(url_for('dashboard', user=current_user))
+
     exec_type_functions = {
-        'xos': (restart_xos_service,),
-        'xray': (
+        'xos': [restart_xos_service],
+        'xray': [
             reset_xray_config,
-            lambda: logging.info("Xray服务已经运行!") if is_xray_enabled() else reset_xray_services()),
-        'restart': (lambda: restart_xray_service('xray'),),
+            lambda: logging.info("Xray服务已经运行!")
+            if is_xray_enabled() else reset_xray_services()
+        ],
+        'restart': [lambda: restart_xray_service('xray')],
     }
 
+    if exec_type not in exec_type_functions:
+        logging.warning(f"未知的系统操作请求: {exec_type}")
+        return redirect(url_for('dashboard', user=current_user))
+
     try:
-        for func in exec_type_functions.get(exec_type, ()):
+        for func in exec_type_functions[exec_type]:
             func()
-
     except Exception as e:
-        logging.error(f"执行系统操作时发生错误: {str(e)}")
+        logging.error(f"执行系统操作时发生错误: {e}")
 
+    # ⭐ 核心：永远离开执行 URL
     return redirect(url_for('dashboard', user=current_user))
 
 
