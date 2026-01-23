@@ -1233,20 +1233,27 @@ def decode_socks_link(socks_link):
     try:
         # 如果链接以 socks:// 开头，去掉前缀
         if socks_link.startswith("socks://"):
-            socks_link = socks_link[len("socks://") :]
+            socks_link = socks_link[len("socks://"):]
 
-        # 格式: target_ip:port:username:password
-        parts = socks_link.split(":", 2)  # 只拆分前两个冒号，剩下的留给用户名和密码
+        # 拆分 IP 和端口，其余留给用户名密码
+        parts = socks_link.split(":", 2)  # 最多拆成三部分
 
-        # 提取协议、目标 IP 和目标端口
+        if len(parts) < 2:
+            raise ValueError("格式错误，至少需要 IP 和端口")
+
         protocol = "socks"
         target_ip = parts[0]
         target_port = int(parts[1])
 
-        # 提取用户名和密码
-        remaining = parts[2].split(":", 1)  # 剩余部分再次以冒号拆分
-        username = remaining[0]
-        password = remaining[1] if len(remaining) > 1 else None
+        # 默认 username/password 都为空
+        username = None
+        password = None
+
+        if len(parts) == 3 and parts[2]:
+            # 再拆分 username:password
+            remaining = parts[2].split(":", 1)
+            username = remaining[0] if remaining[0] else None
+            password = remaining[1] if len(remaining) > 1 and remaining[1] else None
 
         # 验证协议
         if protocol.lower() != "socks":
@@ -1256,7 +1263,7 @@ def decode_socks_link(socks_link):
         if not (0 <= target_port <= 65535):
             raise ValueError("端口范围不正确")
 
-        # 验证IP地址
+        # 验证 IP 地址或域名
         if not is_ip_or_domain(target_ip):
             raise ValueError("错误的域名或IP地址")
 
