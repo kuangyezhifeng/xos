@@ -121,9 +121,6 @@
                         <a class="dropdown-item" href="{{ url_for('system', exec_type='xray') }}">
                             <i class="fas fa-cogs mr-2 text-secondary"></i> 重置配置
                         </a>
-                        <a class="dropdown-item" href="{{ url_for('system', exec_type='database') }}">
-                            <i class="fas fa-trash-alt mr-2 text-danger"></i> <strong>清空数据</strong>
-                        </a>
                     </div>
                 </li>
 
@@ -166,9 +163,6 @@
                         </a>
                         <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='proxy_devices') }}">
                             <i class="fas fa-file-import mr-2 text-info"></i> 导入 EXCEL
-                        </a>
-                        <a class="dropdown-item" href="{{ url_for('database', type='proxy') }}">
-                            <i class="fas fa-trash-alt mr-2 text-danger"></i> 清空代理
                         </a>
                     </div>
                 </li>

@@ -224,37 +224,32 @@ def error():
     return render_template('error.html', user=current_user)
 
 
-@app.route('/system', methods=['GET'])
+@app.route('/system', methods=['GET', 'POST'])  # 同时支持GET和POST
 @login_required
 def system():
     exec_type = request.args.get('exec_type')
 
-    if not exec_type:
+    # 如果是耗时的操作，我们开启一个线程来执行，然后立即返回响应
+    if exec_type in ['xos', 'restart', 'xray']:  # 这些操作耗时
+        # 在这里，我们启动一个线程来执行操作
+        def background_task():
+            # 这里执行原来的操作
+            if exec_type == 'xos':
+                restart_xos_service()
+            elif exec_type == 'restart':
+                restart_xray_service('xray')
+            elif exec_type == 'xray':
+                reset_xray_config()
+                if is_xray_enabled():
+                    logging.info("Xray服务已经运行!")
+                else:
+                    reset_xray_services()
+        thread = threading.Thread(target=background_task)
+        thread.start()
+
+        # 立即返回重定向响应
+        flash('操作已在后台执行，请稍候...', 'info')
         return redirect(url_for('dashboard', user=current_user))
-
-    exec_type_functions = {
-        'xos': [restart_xos_service],
-        'xray': [
-            reset_xray_config,
-            lambda: logging.info("Xray服务已经运行!")
-            if is_xray_enabled() else reset_xray_services()
-        ],
-        'restart': [lambda: restart_xray_service('xray')],
-    }
-
-    if exec_type not in exec_type_functions:
-        logging.warning(f"未知的系统操作请求: {exec_type}")
-        return redirect(url_for('dashboard', user=current_user))
-
-    try:
-        for func in exec_type_functions[exec_type]:
-            func()
-    except Exception as e:
-        logging.error(f"执行系统操作时发生错误: {e}")
-
-    # ⭐ 核心：永远离开执行 URL
-    return redirect(url_for('dashboard', user=current_user))
-
 
 @app.route('/database', methods=['GET'])
 @login_required
