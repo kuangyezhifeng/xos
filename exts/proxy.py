@@ -479,19 +479,25 @@ def reset_xray_services():
     xray_service_content = """
 [Unit]
 Description=Xray Service
-After=network.target
-Wants=network.target
+Documentation=https://xtls.github.io/
+After=network.target nss-lookup.target
 
 [Service]
 Type=simple
+User=root
+# 核心权限配置：绑定低端口 + 透明代理所需
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
+# 安全限制：不允许提升权限
+NoNewPrivileges=true
+# 环境变量（可选，用于解决某些DNS问题）
+Environment="XRAY_LOCATION_ASSET=/usr/local/xos/xray"
+# 进程管理
 PIDFile=/run/xray.pid
-ExecStart=/usr/local/xos/xray/xray -config /usr/local/xos/xray/config.json
-Restart=always
+ExecStart=/usr/local/xos/xray/xray run -config /usr/local/xos/xray/config.json
+Restart=on-failure
 RestartSec=5
-StartLimitInterval=0
-#Restart=on-failure
-# Don't restart in the case of configuration error
-RestartPreventExitStatus=23
+# 资源限制
 LimitNPROC=500
 LimitNOFILE=1000000
 
@@ -1157,57 +1163,48 @@ def decode_shadowsocks_link(ss_url):
 
 def decode_hysteria2_url(hysteria2_url):
     result = {}
-    # Remove the protocol header
-    hysteria2_url = hysteria2_url.replace("hysteria2://", "")
 
-    # Extract server address and port
-    server_port = hysteria2_url.split("@")[1].split("?")[0]
-    server, port = server_port.split(":")
-    # Remove any trailing slash from the port
-    port = port.rstrip("/")
+    # 使用标准 URL 解析
+    parsed = urlparse(hysteria2_url)
+
+    # ===== auth（重点修复）=====
+    # hysteria2 的 auth 在 netloc 的 userinfo 部分
+    # userinfo 可能是 username 或 username:password，但 hysteria2 通常整体作为 auth
+    auth = parsed.netloc.split("@")[0]
+    result["auth"] = unquote(auth)  # 🔥 关键：URL decode
+
+    # ===== server & port =====
+    server = parsed.hostname
+    port = parsed.port
     result["server"] = f"{server}:{port}"
 
-    # Extract password
-    password = hysteria2_url.split("@")[0]
-    result["auth"] = password
+    # ===== query 参数 =====
+    query = parse_qs(parsed.query)
 
-    # Extract SNI and insecure flag
-    sni_insecure_part = hysteria2_url.split("sni=")[-1].split("&")
-    if len(sni_insecure_part) > 1:
-        insecure_value = sni_insecure_part[1].split("=")[1]
-        if insecure_value.isdigit():
-            result["tls"] = {
-                "sni": sni_insecure_part[0],
-                "insecure": bool(int(insecure_value)),
-            }
-        else:
-            result["tls"] = {"sni": sni_insecure_part[0], "insecure": True}
-    else:
-        result["tls"] = {"sni": "", "insecure": True}
+    # ===== TLS =====
+    sni = query.get("sni", [""])[0]
+    insecure = query.get("insecure", query.get("allowInsecure", ["1"]))[0]
 
-    # Extract obfs parameters
-    obfs_type = None
-    obfs_password = None
-    if "obfs=" in hysteria2_url:
-        obfs_type = hysteria2_url.split("obfs=")[1].split("&")[0]
+    result["tls"] = {
+        "sni": sni,
+        "insecure": bool(int(insecure)) if str(insecure).isdigit() else True,
+    }
+
+    # ===== obfs =====
+    if "obfs" in query:
+        obfs_type = query["obfs"][0]
         result["obfs"] = {"type": obfs_type}
-    if "obfs-password=" in hysteria2_url:
-        obfs_password = hysteria2_url.split("obfs-password=")[1].split("&")[0]
-        if obfs_type:
-            result["obfs"][obfs_type] = {"password": obfs_password}
 
-    # Generate a random port number
+        if "obfs-password" in query:
+            result["obfs"][obfs_type] = {
+                "password": unquote(query["obfs-password"][0])
+            }
+
+    # ===== socks5 =====
     random_port = random.randint(60000, 65534)
     result["socks5"] = {"listen": f"0.0.0.0:{random_port}"}
 
-    # 添加带宽配置
-    result["bandwidth"] = {
-        "up": "100 mbps",  # 最大上行带宽 100 Mbps
-        "down": "500 mbps",  # 最大下行带宽 500 Mbps
-    }
-
     return result
-
 
 """
 
@@ -1754,9 +1751,6 @@ def create_and_run_hysteria2(json_config, tag):
         json.dump(json_config, json_file, indent=4, ensure_ascii=False)
         logging.info(f"已创建配置文件: {json_file_path}")
 
-    # # 使用 runuser 启动进程
-    # command = f'runuser -l xray -c \'hysteria2 client -c {json_file_path} 2>/dev/null &\''
-    # subprocess.Popen(command, shell=True)
     # 由进程模式改为服务运行模式,优点开机自己启动，离线自动恢复运行
     service_name = create_systemd_service(tag, json_file_path)
     subprocess.run(["sudo", "systemctl", "daemon-reload"])
