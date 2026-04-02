@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 from flask import redirect, url_for, flash
 from urllib.request import urlopen
 from urllib.parse import parse_qs, urlparse, unquote
@@ -18,7 +17,6 @@ import random
 import ipaddress
 import logging
 import socket
-import requests
 
 # 配置你的操作日志
 logging.basicConfig(
@@ -34,7 +32,6 @@ logging.getLogger("werkzeug").propagate = False
 # xray配置文件路径
 CONFIG_PATH = "/usr/local/xos/xray/config.json"
 CHECK_PATH = "/usr/local/xos/xray/xray-check.json"
-XRAY_FORWARD_PATH = "/usr/local/xos/xray/xray_forward.json"
 HYSTERIA2_FOLDER = "/etc/hysteria2/"
 XRAY = "/etc/systemd/system/xray.service"
 XRAY_CHECK = "/etc/systemd/system/xray-check.service"
@@ -44,11 +41,7 @@ TPROXY_PORT = 12345
 TPROXY_IP = "127.0.0.1"
 test_result = {}
 update_in_progress = False
-API_LIST = [
-    "https://ipinfo.io/{ip}/json",
-    "http://ip-api.com/json/{ip}",
-    "https://ipwhois.app/json/{ip}"
-]
+
 
 def update_handler():
     global update_in_progress
@@ -292,11 +285,10 @@ def xray_useradd():
         subprocess.run(iptables_rule, shell=True, check=True)
         logging.info(f"✅为用户 '{xray_username}' (UID: {user_uid}) 添加 iptables 规则成功。")
     except subprocess.CalledProcessError as e:
-        logging.error(f"❌ 添加 iptables 规则时发生错误: {e}")
+        logging.error(f"添加 iptables 规则时发生错误: {e}")
 
 
 # 设置启停标志
-
 def set_tag(proxies):
     if proxies.flag == 1:
         proxies.flag = 0
@@ -307,11 +299,20 @@ def set_tag(proxies):
 
 
 def set_config(proxies):
-    if proxies.flag == 1:
-        xray_node_outbound_remove(proxies.tag)
+    if proxies.protocol == "hysteria2":
+        if proxies.flag == 1:
+            xray_node_outbound_remove(proxies.tag)
+            uninstall_hysteria2_service(proxies.tag)
+        else:
+            xray_node_outbound_add(proxies.proxy_url, proxies.tag)
+        set_tag(proxies)
+
     else:
-        xray_node_outbound_add(proxies.proxy_url, proxies.tag)
-    set_tag(proxies)
+        if proxies.flag == 1:
+            xray_node_outbound_remove(proxies.tag)
+        else:
+            xray_node_outbound_add(proxies.proxy_url, proxies.tag)
+        set_tag(proxies)
 
 
 def switch_proxy_mode(mode):
@@ -528,7 +529,6 @@ LimitNOFILE=1000000
 
 [Install]
 WantedBy=multi-user.target
-
     """
 
     # 写入服务文件
@@ -713,7 +713,7 @@ def reset_xray_config():
     # Xray Config
     xray_config_content = {
         "log": {
-            "loglevel": "debug",
+            "loglevel": "warning",
             "error": "/var/log/xray/error.log",
             "access": "/var/log/xray/access.log",
         },
@@ -915,6 +915,22 @@ def proxy_lan_share():
         share_config
     )  # 使用 extend 方法将列表中的字典添加到 xray_config["inbounds"] 中
     save_xray_config(xray_config, CONFIG_PATH)
+
+
+def uninstall_hysteria2_service(tag):
+    # 停止服务
+    subprocess.run(["sudo", "systemctl", "stop", f"{tag}.service"])
+    # 禁用服务
+    subprocess.run(["sudo", "systemctl", "disable", f"{tag}.service"])
+    # 删除服务文件
+    service_file_path = f"/etc/systemd/system/{tag}.service"
+    subprocess.run(["sudo", "rm", service_file_path])
+    subprocess.run(["sudo", "rm", f"/etc/hysteria2/{tag}.json"])
+    # 重新加载 Systemd
+    subprocess.run(["sudo", "systemctl", "daemon-reload"])
+    logging.info(f"✅已卸载hysteria2服务: {tag}")
+
+    return True
 
 
 """
@@ -1145,57 +1161,48 @@ def decode_shadowsocks_link(ss_url):
         return None
 
 
-def decode_hysteria2_url(hysteria2_url: str) -> dict:
+def decode_hysteria2_url(hysteria2_url):
     result = {}
 
-    # Remove the protocol header
-    if hysteria2_url.startswith("hysteria2://"):
-        hysteria2_url = hysteria2_url[len("hysteria2://"):]
+    # 使用标准 URL 解析
+    parsed = urlparse(hysteria2_url)
 
-    # Split auth and the rest
-    if "@" not in hysteria2_url:
-        raise ValueError("Invalid hysteria2 URL: missing '@'")
+    # ===== auth（重点修复）=====
+    # hysteria2 的 auth 在 netloc 的 userinfo 部分
+    # userinfo 可能是 username 或 username:password，但 hysteria2 通常整体作为 auth
+    auth = parsed.netloc.split("@")[0]
+    result["auth"] = unquote(auth)  # 🔥 关键：URL decode
 
-    auth_part, address_part = hysteria2_url.split("@", 1)
-    result["auth"] = unquote(auth_part)
-
-    # Parse server and query
-    parsed = urlparse("hysteria2://" + address_part)
-    if ":" not in parsed.netloc:
-        raise ValueError("Invalid hysteria2 URL: missing port")
-
-    server, port = parsed.netloc.split(":", 1)
-    port = port.rstrip("/")
+    # ===== server & port =====
+    server = parsed.hostname
+    port = parsed.port
     result["server"] = f"{server}:{port}"
 
-    # Parse query parameters
-    qs = parse_qs(parsed.query)
+    # ===== query 参数 =====
+    query = parse_qs(parsed.query)
 
-    # SNI and insecure
-    sni = qs.get("sni", [""])[0]
-    insecure_raw = qs.get("insecure", ["1"])[0]
-    insecure = bool(int(insecure_raw)) if insecure_raw.isdigit() else True
+    # ===== TLS =====
+    sni = query.get("sni", [""])[0]
+    insecure = query.get("insecure", query.get("allowInsecure", ["1"]))[0]
+
     result["tls"] = {
         "sni": sni,
-        "insecure": insecure
+        "insecure": bool(int(insecure)) if str(insecure).isdigit() else True,
     }
 
-    # ===== 新增：mport =====
-    mport = qs.get("mport", [None])[0]
-    if mport:
-        result["mport"] = mport
-    # ======================
-
-    # Obfs parameters
-    obfs_type = qs.get("obfs", [None])[0]
-    obfs_password = qs.get("obfs-password", [None])[0]
-
-    if obfs_type:
+    # ===== obfs =====
+    if "obfs" in query:
+        obfs_type = query["obfs"][0]
         result["obfs"] = {"type": obfs_type}
-        if obfs_password:
+
+        if "obfs-password" in query:
             result["obfs"][obfs_type] = {
-                "password": unquote(obfs_password)
+                "password": unquote(query["obfs-password"][0])
             }
+
+    # ===== socks5 =====
+    random_port = random.randint(60000, 65534)
+    result["socks5"] = {"listen": f"0.0.0.0:{random_port}"}
 
     return result
 
@@ -1226,20 +1233,27 @@ def decode_socks_link(socks_link):
     try:
         # 如果链接以 socks:// 开头，去掉前缀
         if socks_link.startswith("socks://"):
-            socks_link = socks_link[len("socks://") :]
+            socks_link = socks_link[len("socks://"):]
 
-        # 格式: target_ip:port:username:password
-        parts = socks_link.split(":", 2)  # 只拆分前两个冒号，剩下的留给用户名和密码
+        # 拆分 IP 和端口，其余留给用户名密码
+        parts = socks_link.split(":", 2)  # 最多拆成三部分
 
-        # 提取协议、目标 IP 和目标端口
+        if len(parts) < 2:
+            raise ValueError("格式错误，至少需要 IP 和端口")
+
         protocol = "socks"
         target_ip = parts[0]
         target_port = int(parts[1])
 
-        # 提取用户名和密码
-        remaining = parts[2].split(":", 1)  # 剩余部分再次以冒号拆分
-        username = remaining[0]
-        password = remaining[1] if len(remaining) > 1 else None
+        # 默认 username/password 都为空
+        username = None
+        password = None
+
+        if len(parts) == 3 and parts[2]:
+            # 再拆分 username:password
+            remaining = parts[2].split(":", 1)
+            username = remaining[0] if remaining[0] else None
+            password = remaining[1] if len(remaining) > 1 and remaining[1] else None
 
         # 验证协议
         if protocol.lower() != "socks":
@@ -1249,7 +1263,7 @@ def decode_socks_link(socks_link):
         if not (0 <= target_port <= 65535):
             raise ValueError("端口范围不正确")
 
-        # 验证IP地址
+        # 验证 IP 地址或域名
         if not is_ip_or_domain(target_ip):
             raise ValueError("错误的域名或IP地址")
 
@@ -1471,7 +1485,7 @@ def save_xray_config(xray_config, config_path):
         return True
 
     except IOError as e:
-        logging.error(f"❌写入配置文件时发生错误: {e}")
+        logging.error(f"写入配置文件时发生错误: {e}")
         return False
 
 
@@ -1702,7 +1716,9 @@ def generate_node_outbound(config, tag, protocol=None):
     elif protocol == "shadowsocks":
         json_config = generate_shadowsocks_config(config, tag)
     else:
-        json_config = generate_hysteria2_config(config, tag)
+        create_and_run_hysteria2(config, tag)
+        json_config = generate_hysteria2_config(tag, tag)
+
     return json_config
 
 
@@ -1742,9 +1758,6 @@ def create_and_run_hysteria2(json_config, tag):
         json.dump(json_config, json_file, indent=4, ensure_ascii=False)
         logging.info(f"已创建配置文件: {json_file_path}")
 
-    # # 使用 runuser 启动进程
-    # command = f'runuser -l xray -c \'hysteria2 client -c {json_file_path} 2>/dev/null &\''
-    # subprocess.Popen(command, shell=True)
     # 由进程模式改为服务运行模式,优点开机自己启动，离线自动恢复运行
     service_name = create_systemd_service(tag, json_file_path)
     subprocess.run(["sudo", "systemctl", "daemon-reload"])
@@ -1987,168 +2000,38 @@ def generate_trojan_config(trojan_json, tag):
     return json_config
 
 
-# def generate_hysteria2_config(hy_config, tag):
-#     """
-#     生成 Xray 26.1.18 hysteria 出站配置（自动解码 URI auth）
-#     hy_config: dict 包含 server, auth, tls, network, congestion, up, down, udphop, obfs
-#     """
-#     from urllib.parse import unquote
-#
-#     # 拆 server -> address, port
-#     if ':' not in hy_config['server']:
-#         raise ValueError("server 必须是 '地址:端口' 格式")
-#     address, port_str = hy_config['server'].split(':', 1)
-#     port = int(port_str)
-#
-#     # 解码 auth（防止 URI 中的 %28 %21 等被原样写入 JSON）
-#     auth_decoded = unquote(hy_config.get("auth", ""))
-#
-#     # 基本 settings
-#     settings = {
-#         "version": 2,
-#         "address": address,
-#         "port": port
-#     }
-#
-#     # hysteriaSettings（先不加 udphop）
-#     hysteriaSettings = {
-#         "version": 2,
-#         "auth": auth_decoded,
-#         "congestion": hy_config.get("congestion", "bbr"),
-#         "up": hy_config.get("up", "300mbps"),
-#         "down": hy_config.get("down", "300mbps"),
-#     }
-#
-#     # 如果有 mport → 生成 udphop
-#     mport = hy_config.get("mport")
-#     if mport:
-#         hysteriaSettings["udphop"] = {
-#             "port": mport,
-#             "interval": 30
-#         }
-#
-#     # streamSettings
-#     streamSettings = {
-#         "sockopt": {"mark": 128},
-#         "network": hy_config.get("network", "hysteria"),
-#         "hysteriaSettings": hysteriaSettings,
-#         "security": "tls",
-#         "tlsSettings": {
-#             "serverName": hy_config.get("tls", {}).get("sni", ""),
-#             "allowInsecure": True,
-#             "alpn": ["h3"]
-#         }
-#     }
-#
-#     # 如果提供混淆密码，添加 udpmasks
-#     obfs = hy_config.get("obfs")
-#     if obfs:
-#         # 如果 obfs 是字符串，直接用；如果是对象，尝试提取 password 字段
-#         if isinstance(obfs, str):
-#             password_str = obfs
-#         elif isinstance(obfs, dict):
-#             # 支持 {'type': 'salamander', 'salamander': {'password': 'xxx'}}
-#             if "salamander" in obfs and "password" in obfs["salamander"]:
-#                 password_str = obfs["salamander"]["password"]
-#             else:
-#                 raise ValueError("obfs 对象格式不正确，无法提取 password")
-#         else:
-#             raise ValueError("obfs 必须是字符串或 dict")
-#
-#         streamSettings["udpmasks"] = [
-#             {
-#                 "type": "salamander",
-#                 "settings": {
-#                     "password": password_str
-#                 }
-#             }
-#         ]
-#
-#     json_config = {
-#         "tag": tag,
-#         "protocol": "hysteria",
-#         "settings": settings,
-#         "streamSettings": streamSettings
-#     }
-#
-#     return json_config
+def generate_hysteria2_config(tag, filename=""):
+    # 构建配置文件路径
+    config_file_path = f"{HYSTERIA2_FOLDER}{filename}.json"
+    config = load_xray_config(config_file_path)
+    try:
+        # 提取 socks5 字段
+        socks5_data = config.get("socks5", {})
+        # 提取 listen 字段的值
+        listen_address = socks5_data.get("listen", "")
 
-def generate_hysteria2_config(hy_config, tag):
-    """
-    生成 Xray 26.3+ hysteria 出站配置（自动解码 URI auth，兼容 finalmask）
-    hy_config: dict 包含 server, auth, tls, network, obfs
-    """
-    from urllib.parse import unquote
+        # 从 listen 地址中提取端口号
+        port = int(listen_address.split(":")[-1])
+        server = "127.0.0.1"
 
-    # 拆 server -> address, port
-    if ':' not in hy_config['server']:
-        raise ValueError("server 必须是 '地址:端口' 格式")
-    address, port_str = hy_config['server'].split(':', 1)
-    port = int(port_str)
-
-    # 解码 auth（防止 URI 中的 %28 %21 等被原样写入 JSON）
-    auth_decoded = unquote(hy_config.get("auth", ""))
-
-    # 基本 settings
-    settings = {
-        "version": 2,
-        "address": address,
-        "port": port
-    }
-
-    # hysteriaSettings（新版不再支持 congestion/up/down/udphop）
-    hysteriaSettings = {
-        "version": 2,
-        "auth": auth_decoded
-    }
-
-    # streamSettings
-    streamSettings = {
-        "sockopt": {"mark": 128},
-        "network": hy_config.get("network", "hysteria"),
-        "hysteriaSettings": hysteriaSettings,
-        "security": "tls",
-        "tlsSettings": {
-            "serverName": hy_config.get("tls", {}).get("sni", ""),
-            "allowInsecure": True,  # 你的场景必须保留
-            "alpn": ["h3"]
-        }
-    }
-
-    # 如果提供混淆密码，添加 finalmask
-    obfs = hy_config.get("obfs")
-    if obfs:
-        if isinstance(obfs, str):
-            password_str = obfs
-        elif isinstance(obfs, dict):
-            # 支持 {'type': 'salamander', 'salamander': {'password': 'xxx'}}
-            if "salamander" in obfs and "password" in obfs["salamander"]:
-                password_str = obfs["salamander"]["password"]
-            else:
-                raise ValueError("obfs 对象格式不正确，无法提取 password")
-        else:
-            raise ValueError("obfs 必须是字符串或 dict")
-
-        streamSettings["finalmask"] = {
-            "udp": [
-                {
-                    "type": "salamander",
-                    "settings": {
-                        "password": password_str
+        # hysteria2特殊配置
+        json_config = {
+            "tag": tag,
+            "protocol": "socks",
+            "settings": {
+                "servers": [
+                    {
+                        "address": server,
+                        "port": port,
                     }
-                }
-            ]
+                ]
+            },
+            "streamSettings": {"sockopt": {"tcpFastOpen": True}},
         }
+        return json_config
+    except Exception as e:
+        logging.error("hysteria2配置文件未生成无法解析端口连接")
 
-    # 最终 JSON 配置
-    json_config = {
-        "tag": tag,
-        "protocol": "hysteria",
-        "settings": settings,
-        "streamSettings": streamSettings
-    }
-
-    return json_config
 
 """
 xray_node_outbound_add 函数
@@ -2287,16 +2170,11 @@ def xray_node_route_add(xray_config, decode_data, protocol):
     elif protocol == "trojan":
         access_ip = decode_data.get("server")
         port = decode_data.get("port")
-    # hysteria2 协议
+
+    # hy2协议特殊无需路由
     elif protocol == "hysteria2":
-        server = decode_data.get("server")
-        access_ip, port_str = server.rsplit(":", 1)
-
-        if not port_str.isdigit():
-            logging.warning("hysteria2 端口非法: %s", server)
-            return
-        port = int(port_str)
-
+        logging.info("hysteria2 xray路由添加跳过")
+        return
 
     # 获取已有的规则列表
     existing_rules = xray_config["routing"].get("rules", [])
@@ -2341,6 +2219,17 @@ def xray_node_route_add(xray_config, decode_data, protocol):
             xray_config["routing"].setdefault("rules", []).insert(0, new_rule)
         else:
             logging.warning(f"当前节点路由规则已经存在: {access_ip}:{port}")
+
+    # if not existing_rule:
+    #     # 判断 access_ip 是域名还是IP地址
+    #     if is_ip_address(access_ip):
+    #         new_rule = {"type": "field", "outboundTag": "direct", "ip": [access_ip], "port": port}
+    #     else:
+    #         new_rule = {"type": "field", "outboundTag": "direct", "domain": [access_ip], "port": port}
+    #
+    #     xray_config["routing"].setdefault("rules", []).insert(0, new_rule)
+    # else:
+    #     logging.warning(f"当前节点路由规则已经存在:{access_ip}:{port}")
 
 
 """
@@ -2438,10 +2327,35 @@ def xray_node_route_remove(proxy_url, config_path=CONFIG_PATH):
         access_ip = decode_data.get("server")
         port = decode_data.get("port")
 
-    elif protocol == "hysteria2":
-        server = decode_data.get("server")
-        access_ip, port_str = server.rsplit(":", 1)
-        port = int(port_str)
+    else:
+
+        def extract_socks5_port(decode_data):
+            directory = "/etc/hysteria2"
+            target_server = decode_data.get("server")
+            if not target_server:
+                return None
+
+            for filename in os.listdir(directory):
+                if filename.endswith(".json"):
+                    filepath = os.path.join(directory, filename)
+                    with open(filepath, "r") as file:
+                        data = json.load(file)
+                        if data.get("server") == target_server:
+                            socks5_listen = data.get("socks5", {}).get("listen")
+                            if socks5_listen:
+                                _, port = socks5_listen.split(":")
+                                return int(port)
+            return None
+
+        access_ip = "127.0.0.1"
+        port = extract_socks5_port(decode_data)
+
+    # 转换端口为整数类型
+    try:
+        port = int(port)
+    except Exception:
+        logging.error(f"端口转换失败：{port}")
+        return
 
     logging.info(f"✅[ROUTE REMOVE] 协议: {protocol}, IP: {access_ip}, PORT: {port}")
 
@@ -2839,7 +2753,16 @@ def generate_test_config(protocol, proxy_url, tag, port):
 
     decode_data, protocol = decode_proxy_link(proxy_url)
     if decode_data:
-        outbound = generate_node_outbound(decode_data, tag, protocol)
+        # 生成节点配置
+        if protocol == "hysteria2":
+            hysteria2_filename = (
+                ProxyDevice.query.filter_by(proxy_url=proxy_url).first().tag
+            )
+            # hysteria2 节点TAG做文件名参数
+            outbound = generate_hysteria2_config(tag, hysteria2_filename)
+
+        else:
+            outbound = generate_node_outbound(decode_data, tag, protocol)
 
         logging.info(f"✅生成的 Outbound 配置: {outbound}")
     else:
@@ -2954,7 +2877,7 @@ def xray_proxies_info_handler(selected_items):
             xray_config["routing"]["rules"].append(routing)
 
         else:
-            logging.error("❌ 无法生成配置.")
+            logging.error("无法生成配置.")
 
     # 保存配置
     save_xray_config(xray_config, CHECK_PATH)
@@ -3028,6 +2951,9 @@ def xray_node_delete_handler(proxy_device):
         xray_route_remove(tag, "source")
         xray_route_remove(tag, "ip")
         xray_node_route_remove(proxy_url)
+
+        if protocol == "hysteria2":
+            uninstall_hysteria2_service(tag)
 
         # 删除数据库记录
         db.session.delete(proxy_device)
@@ -3292,226 +3218,6 @@ def relay_connection_on(relay_connection):
         logging.error(f"❌ 启动 socat 进程失败，中转规则：{' '.join(cmd)}")
     except (socket.error, socket.timeout) as e:
         logging.error(f"❌ 端口未打开，中转规则：{' '.join(cmd)}，错误：{e}")
-
-
-def generate_xray_forward(relay_connections, selected_nodes=None):
-    # 直接写入初始配置，覆盖原文件
-    # 初始化配置
-    xray_forward_config = {
-        "log": {
-            "loglevel": "debug",
-            "error": "/var/log/xray/error.log",
-            "access": "/var/log/xray/access.log"
-        },
-        "api": {
-            "tag": "api",
-            "listen": "127.0.0.1:8880",
-            "services": [
-                "HandlerService",
-                "LoggerService",
-                "StatsService",
-                "RoutingService"
-            ]
-        },
-        "inbounds": [],
-        "outbounds": [
-            {"protocol": "freedom", "tag": "direct", "settings": {}}
-        ],
-        "routing": {
-            "rules": [],
-            "balancers": []  # balancers 放到 routing 下
-        }
-    }
-
-    with open(XRAY_FORWARD_PATH, "w") as f:
-        json.dump(xray_forward_config, f, indent=2)
-
-    inbounds = []
-    inbound_tags = []
-    used_ports = set()
-    outbounds = []
-    outbound_tags = []
-    routing_rules = []
-    routing_balancers = []
-
-    for relay in relay_connections:
-        # 只处理启用状态
-        if relay.status not in (None, '', 0, '0'):
-            continue
-
-        # 防止端口重复
-        if relay.source_port in used_ports:
-            continue
-        used_ports.add(relay.source_port)
-
-        tag = f"in-{relay.source_port}"
-
-        inbound = {
-            "tag": tag,
-            "port": relay.source_port,
-            "listen": "0.0.0.0",
-            "protocol": "dokodemo-door",
-            "settings": {
-                "address": relay.target_ip,
-                "port": relay.target_port,
-                "network": "tcp,udp" if relay.protocol == "tcp" else "udp"
-            }
-        }
-
-        inbounds.append(inbound)
-        inbound_tags.append(tag)
-
-    # 处理用户选择的节点，由 xray_node_outbound_add 写入配置
-    if selected_nodes:
-        for node in selected_nodes:
-            # 拆 IP|tag
-            if '|' in node:
-                _, tag_part = node.split('|', 1)
-            else:
-                tag_part = node
-
-            # 查询数据库
-            conn = ProxyDevice.query.filter_by(tag=tag_part).first()
-            if conn:
-                decode_data, protocol = decode_proxy_link(conn.proxy_url)
-                # 生成节点配置
-                outbound = generate_node_outbound(decode_data, conn.tag, protocol)
-                outbounds.append(outbound)
-                outbound_tags.append(conn.tag)
-                # 生成路由配置
-                xray_node_route_add(xray_forward_config, decode_data, protocol)
-                node_domain_set(xray_forward_config, decode_data)
-
-    # 生成 balancer 配置（放在 routing 下）
-    if outbound_tags:
-        balancer_tag = "balancer"
-        routing_balancers.append({
-            "tag": balancer_tag,
-            "selector": outbound_tags,
-            "strategy": {"type": "roundRobin"}
-        })
-
-    # 生成 routing 规则
-    if inbound_tags:
-        routing_rules.append({
-            "type": "field",
-            "inboundTag": inbound_tags,
-            "balancerTag": "balancer"  # 改为 balancerTag
-        })
-
-    final_config = {
-        "log": xray_forward_config["log"],  # 日志
-        "api": xray_forward_config["api"],  # API
-        "inbounds": inbounds,
-        "outbounds": outbounds,
-        "routing": {
-            "rules": routing_rules,
-            "balancers": routing_balancers  # 注意这里是 routing 下的 balancers
-        }
-    }
-
-    # 保存到文件，覆盖写入
-    with open(XRAY_FORWARD_PATH, "w") as f:
-        json.dump(final_config, f, indent=2)
-
-    install_or_restart_service()
-
-def install_or_restart_service(service_name="xray_forward"):
-    service_file_path = f"/etc/systemd/system/{service_name}.service"
-    xray_forward_service = """
-    [Unit]
-    Description=Xray Forward
-    Documentation=https://xtls.github.io/
-    After=network.target nss-lookup.target
-
-    [Service]
-    Type=simple
-    User=root
-    CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
-    AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
-    NoNewPrivileges=true
-    Environment="XRAY_LOCATION_ASSET=/usr/local/xos/xray"
-    PIDFile=/run/xray_forward.pid
-    ExecStart=/usr/local/xos/xray/xray run -config /usr/local/xos/xray/xray_forward.json
-    Restart=on-failure
-    RestartSec=5
-    LimitNPROC=500
-    LimitNOFILE=1000000
-
-    [Install]
-    WantedBy=multi-user.target
-    """
-
-    # 检查服务是否存在
-    result = subprocess.run(["systemctl", "status", service_name], capture_output=True, text=True)
-    service_exists = result.returncode == 0 or "Loaded" in result.stdout
-
-    if service_exists:
-        logging.info(f"服务 {service_name} 已存在，正在重启...")
-        subprocess.run(["systemctl", "daemon-reload"])
-        subprocess.run(["systemctl", "restart", service_name])
-        subprocess.run(["systemctl", "enable", service_name])
-        logging.info(f"服务 {service_name} 已重启完成。")
-    else:
-        logging.info(f"服务 {service_name} 不存在，正在创建并安装...")
-        # 写入 service 文件
-        with open(service_file_path, "w") as f:
-            f.write(xray_forward_service)
-        # 重新加载 systemd 配置
-        subprocess.run(["systemctl", "daemon-reload"])
-        # 启用并启动服务
-        subprocess.run(["systemctl", "enable", service_name])
-        subprocess.run(["systemctl", "start", service_name])
-        logging.info(f"服务 {service_name} 安装并启动完成。")
-
-
-def fetch_country(ip):
-    """获取 IP 的国家缩写，多个 API fallback"""
-    for api in API_LIST:
-        try:
-            url = api.format(ip=ip)
-            r = requests.get(url, timeout=5)
-            if r.status_code == 200:
-                data = r.json()
-                if not isinstance(data, dict):
-                    continue
-
-                # ipinfo.io 返回 "country": "VN"
-                if "country" in data:
-                    return data["country"].upper()
-                # ip-api.com 返回 "countryCode": "VN"
-                if "countryCode" in data:
-                    return data["countryCode"].upper()
-                # ipwhois.app 返回 "country_code": "VN"
-                if "country_code" in data:
-                    return data["country_code"].upper()
-        except Exception as e:
-            logging.warning(f"API {api} 查询 {ip} 失败: {e}")
-        time.sleep(0.1)  # 调速，避免同时请求太快
-    return "未知"
-
-def test_single_connection(connection):
-    """测试单个 TCP 端口并获取 IP 信息（只提取国家缩写）"""
-    target_ip = connection.target_ip
-    target_port = connection.target_port
-
-    if getattr(connection, 'protocol', 'tcp') == 'tcp':
-        try:
-            s = socket.create_connection((target_ip, target_port), timeout=5)
-            s.close()
-            connection.alive = 1
-            logging.info(f"测试端口活动: {target_ip}:{target_port}")
-        except (socket.timeout, ConnectionRefusedError, OSError):
-            connection.alive = 0
-            logging.error(f"测试端口关闭: {target_ip}:{target_port}")
-    else:
-        # UDP 不检测端口
-        connection.alive = 1  # 标记为 UDP 未检测
-
-    # 获取 IP 国家缩写
-    connection.info = fetch_country(target_ip)
-    return connection
-
 
 
 """
