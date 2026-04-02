@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% block styles %}
+    {{ super() }}
+
+    <style>
+        body {
+            background: url(static/images/wildlee.svg) no-repeat center;
+            background-position: center 0;
+            background-size: cover;
+            margin: 0px;
+        }
+
+        .signin-container {
+            background-color: rgba(232, 86, 41, 0.9);
+            width: 1024px;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 10px;
+            color: white;
+        }
+
+        .form-check {
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            user-select: none;
+        }
+        .form-check:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .form-check-input {
+            width: 12px;
+            height: 12px;
+            cursor: pointer;
+            margin-right: 12px;  /* 调整右边距 */
+        }
+
+        .form-check-label {
+            font-weight: 600;
+            color: #fff;
+            user-select: none;
+            margin-left: 12px;    /* 文字左边距 */
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+
+        /* 这里是改动的按钮样式，和你之前给的一致 */
+        .btn {
+            border-radius: 8px;
+            font-weight: bold;
+            background-color: #ffffff;
+            color: #e85629;
+            transition: all 0.25s ease-in-out;
+            padding: 10px 20px;
+            border: none;
+            box-shadow: none;
+        }
+
+        .btn:hover {
+            background-color: #ff8c4a;
+            color: white;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="signin-container">
+        <form class="form-horizontal" method="post" action="{{ url_for('xray_forward') }}">
+            <div class="row">
+                <div class="col-sm-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="select-all">
+                        <label class="form-check-label" for="select-all">
+                            全选
+                        </label>
+                    </div>
+                </div>
+                {% for item in target_ips %}
+                    <div class="col-sm-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="selected_target_ip"
+                                   value="{{ item['ip'] }}|{{ item['tag'] }}"
+                                   id="{{ item['ip'] }}" {% if item['selected'] %}checked{% endif %}>
+                            <label class="form-check-label" for="{{ item['ip'] }}">
+                                {{ item['ip'] }} - {{ item['tag'] }}
+                            </label>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="button-container mt-4">
+                <button type="submit" class="btn col-sm-4">设置出站节点</button>
+                <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn col-sm-4">返回</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // 使用箭头函数修复 "this" 上下文问题
+        document.getElementById('select-all').addEventListener('change', (e) => {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"][name="selected_target_ip"]');
+            checkboxes.forEach(cb => cb.checked = e.target.checked);
+        });
+    </script>
+{% endblock %}
