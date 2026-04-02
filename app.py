@@ -741,13 +741,13 @@ def relay_update():
 def relay_clone():
     relay_id = request.args.get('id')
     if not relay_id:
-        flash("未指定要克隆的规则ID", "error")
+        logging.error("未指定要克隆的规则ID")
         return redirect(url_for('relay_connections'))
 
     # 获取原始规则
     original = db.session.get(RelayConnection, relay_id)
     if not original:
-        flash(f"ID {relay_id} 的规则不存在", "error")
+        logging.error(f"ID {relay_id} 的规则不存在")
         return redirect(url_for('relay_connections'))
 
     try:
@@ -769,11 +769,10 @@ def relay_clone():
 
         db.session.add(cloned)
         db.session.commit()
-        flash(f"规则ID {relay_id} 克隆成功，新ID: {cloned.id}", "success")
+        logging.info(f"规则ID {relay_id} 克隆成功，新ID: {cloned.id}")
     except Exception as e:
         db.session.rollback()
         logging.error(f"克隆规则失败: {e}")
-        flash(f"克隆规则失败: {e}", "error")
 
     return redirect(url_for('relay_connections'))
 """
