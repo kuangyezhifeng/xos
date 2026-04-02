@@ -4,8 +4,14 @@
     {{ super() }}
     <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
     <script src="/static/js/bootstrap.min.js"></script>
-    <body style="background:url(static/images/wildlee.svg) no-repeat center; background-position: center 0; background-size: cover; margin: 0px;">
     <style>
+        body {
+            background: url(static/images/wildlee.svg) no-repeat center;
+            background-position: center 0;
+            background-size: cover;
+            margin: 0px;
+        }
+
         .signin-container {
             background-color: #e85629;
             opacity: 0.9;
@@ -17,12 +23,24 @@
 
         .form-control {
             border-radius: 5px;
-            color: black; /* 将文本颜色更改为可见的颜色 */
-            background-color: white; /* 将背景颜色更改为可见的颜色 */
+            color: black;
+            background-color: white;
         }
 
-        .btn {
+        /* 统一按钮风格 */
+        .btn-custom {
+            background-color: #e85629;
+            color: white;
+            border: none;
             border-radius: 5px;
+            padding: 10px 20px;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-custom:hover {
+            background-color: #cc4a24;
+            color: white;
         }
 
         .button-container {
@@ -30,10 +48,13 @@
             justify-content: space-between;
         }
 
-        /* 使用 col-form-label 类替代 control-label，设置左对齐 */
         .col-form-label {
             text-align: left !important;
-            color: white; /* 设置标签字体颜色为白色 */
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
         }
     </style>
 {% endblock %}
@@ -46,21 +67,22 @@
                 <label for="inputuser" class="col-sm-4 col-form-label">用户</label>
                 <div class="col-sm-12">
                     <input type="text" name="user" class="form-control" id="inputuser" value=""
-                           placeholder="输入用户">
+                           placeholder="输入用户" required>
                 </div>
             </div>
+
             <div class="form-group row">
                 <label for="inputcountry" class="col-sm-4 col-form-label">国家</label>
                 <div class="col-sm-12">
                     <input type="text" name="country" class="form-control" id="inputcountry" value=""
-                           placeholder="输入国家">
+                           placeholder="输入国家" required>
                 </div>
             </div>
+
             <div class="form-group row">
                 <label for="inputday" class="col-sm-4 col-form-label">日期</label>
                 <div class="col-sm-12">
-                    <input type="date" name="day" class="form-control" id="inputday" value=""
-                           placeholder="输入日期">
+                    <input type="date" name="day" class="form-control" id="inputday" value="" required>
                 </div>
             </div>
 
@@ -68,30 +90,37 @@
                 <label for="inputip" class="col-sm-4 col-form-label">IP</label>
                 <div class="col-sm-12">
                     <input type="text" name="ip" class="form-control" id="inputip" value=""
-                           placeholder="输入IP">
+                           placeholder="输入IP"
+                           pattern="^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$"
+                           title="请输入合法的 IPv4 地址，例如 192.168.0.1"
+                           required>
                 </div>
             </div>
+
             <div class="form-group row">
                 <label for="inputEmail" class="col-sm-4 col-form-label">账号</label>
                 <div class="col-sm-12">
                     <input type="text" name="account" class="form-control" id="inputEmail" value=""
-                           placeholder="输入账号">
+                           placeholder="输入账号" required>
                 </div>
             </div>
+
             <div class="form-group row">
                 <label for="inputpassword" class="col-sm-4 col-form-label">密码</label>
                 <div class="col-sm-12">
                     <input type="text" name="password" class="form-control" id="inputpassword" value=""
-                           placeholder="输入密码">
+                           placeholder="输入密码" required>
                 </div>
             </div>
+
             <div class="form-group row">
                 <label for="inputport" class="col-sm-4 col-form-label">端口</label>
                 <div class="col-sm-12">
-                    <input type="text" name="port" class="form-control" id="inputport" value=""
-                           placeholder="输入端口">
+                    <input type="number" name="port" class="form-control" id="inputport" value=""
+                           placeholder="输入端口" min="1024" max="65535" required>
                 </div>
             </div>
+
             <div class="form-group row">
                 <label for="inputwebsite" class="col-sm-4 col-form-label">网站</label>
                 <div class="col-sm-12">
@@ -99,6 +128,7 @@
                            placeholder="输入网站">
                 </div>
             </div>
+
             <div class="form-group row">
                 <label for="inputremark" class="col-sm-4 col-form-label">备注</label>
                 <div class="col-sm-12">
@@ -106,10 +136,10 @@
                            placeholder="输入备注">
                 </div>
             </div>
-            <div class="button-container mt-12" style="display: flex; color: #808080;">
-                <button type="submit" class="btn col-sm-4">创建</button>
-                <button type="button" onclick="window.location='{{ url_for('host') }}'" class="btn col-sm-4">返回
-                </button>
+
+            <div class="button-container mt-4">
+                <button type="submit" class="btn-custom col-sm-4">创建</button>
+                <button type="button" onclick="window.location='{{ url_for('host') }}'" class="btn-custom col-sm-4">返回</button>
             </div>
         </form>
     </div>

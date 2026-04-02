@@ -5,10 +5,8 @@
     <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
     <script src="/static/js/bootstrap.min.js"></script>
     <style>
-        body, html {
+        body {
             margin: 0;
-            padding: 0;
-            height: 100%;
             background: url(/static/images/wildlee.svg) no-repeat center center fixed;
             background-size: cover;
             font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -33,19 +31,20 @@
             border: 1px solid #ddd;
         }
 
-        .btn {
-            border-radius: 5px;
-            font-weight: 600;
-            background-color: #fff;
-            color: #e85629;
-            border: 2px solid #e85629;
-            transition: all 0.25s ease-in-out;
-        }
-
-        .btn:hover {
+        /* 按钮统一风格 */
+        .btn-custom {
             background-color: #e85629;
             color: white;
-            border-color: #ff8c4a;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-custom:hover {
+            background-color: #cc4a24;
+            color: white;
         }
 
         .button-container {
@@ -70,7 +69,7 @@
         }
 
         .form-group {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
     </style>
 {% endblock %}
@@ -116,23 +115,16 @@
         <div class="form-group">
             <label class="col-form-label">页面行数 &nbsp;<small>每页 {{ config.page_rows }}</small></label>
             <div>
+                {% for rows in [25, 100, 1000] %}
                 <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="page_rows" id="page_25" value="25"
-                        {% if config.page_rows == 25 %}checked{% endif %}>
-                    <label class="form-check-label" for="page_25">25</label>
+                    <input class="form-check-input" type="radio" name="page_rows" id="page_{{ rows }}" value="{{ rows }}"
+                        {% if config.page_rows == rows %}checked{% endif %}>
+                    <label class="form-check-label" for="page_{{ rows }}">{{ rows }}</label>
                 </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="page_rows" id="page_100" value="100"
-                        {% if config.page_rows == 100 %}checked{% endif %}>
-                    <label class="form-check-label" for="page_100">100</label>
-                </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="page_rows" id="page_1000" value="1000"
-                        {% if config.page_rows == 1000 %}checked{% endif %}>
-                    <label class="form-check-label" for="page_1000">1000</label>
-                </div>
+                {% endfor %}
             </div>
         </div>
+
         <!-- 网关健康检测 -->
         <div class="form-group">
             <label class="col-form-label">网关健康检测 &nbsp;
@@ -153,8 +145,8 @@
         </div>
 
         <div class="button-container">
-            <button type="submit" class="btn col-sm-5">保存</button>
-            <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn col-sm-5">返回</button>
+            <button type="submit" class="btn-custom col-sm-5">保存</button>
+            <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn-custom col-sm-5">返回</button>
         </div>
     </form>
 </div>

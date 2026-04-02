@@ -1,5 +1,7 @@
 # coding=utf-8
 # 依赖程序sshpass socat  ssh-keygen -t rsa -b 2048
+import logging
+
 from flask import render_template, send_file, request, jsonify
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from flask_migrate import Migrate
@@ -9,10 +11,11 @@ from exts.log_handler import *
 from exts.conversion import *
 from exts.excel import *
 from exts.socks import alone_socks_config, alone_proxy_url, alone_running_socks, alone_noauth_socks_config
-import pandas as pd
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import case
 from app import create_app
 import psutil
+from concurrent.futures import ThreadPoolExecutor
 import threading
 
 app, socketio = create_app()
@@ -582,8 +585,10 @@ def relay_connections():
         page = request.args.get('page', 1, type=int)
 
         # 使用 paginate 方法获取一个分页对象
-        connections = RelayConnection.query.order_by(-RelayConnection.source_port).paginate(page=page,
-                                                                                            per_page=PER_PAGE)
+        connections = RelayConnection.query.order_by(RelayConnection.source_port.asc()).paginate(
+            page=page,
+            per_page=PER_PAGE
+        )
         # 检查请求的页码是否超过实际页数
         if page > connections.pages and connections.pages > 0:
             return redirect(url_for('relay_connections', page=connections.pages))
@@ -660,6 +665,21 @@ def relay_on_off():
     return redirect(url_for('relay_connections'))
 
 
+@app.route('/xray_forward', methods=['GET', 'POST'])
+@login_required
+def xray_forward():
+    if request.method == 'GET':
+        target_ips = gateway_route_config()
+        return render_template("xray_forward.html", user=current_user, target_ips=target_ips)
+
+    elif request.method == 'POST':
+        selected_nodes = set(request.form.getlist('selected_target_ip'))
+        relay_connections = RelayConnection.query.all()
+
+        # 调用功能函数生成配置 + 添加出站
+        generate_xray_forward(relay_connections, selected_nodes=selected_nodes)
+
+        return redirect(url_for('dashboard', user=current_user))
 """
 relay_update 路由处理函数
 
@@ -671,28 +691,91 @@ relay_update 路由处理函数用于处理 /relay_update 路由的 GET 和 POST
 注意： 在处理 relay_update 路由时，使用了两个请求方法的区分，分别执行获取和更新中转规则的操作。在更新中转规则时，通过查询 RelayConnection 表并使用表单数据更新相应的字段。
 """
 
-
 @app.route('/relay_update', methods=['GET', 'POST'])
 @login_required
 def relay_update():
     if request.method == 'GET':
-        id = request.args.get('id')
-        relay_info = db.session.get(RelayConnection, id)
+        rule_id = request.args.get('id')
+        relay_info = db.session.get(RelayConnection, rule_id)
+        if not relay_info:
+            logging.error("规则不存在！")
+            return redirect(url_for('relay_connections'))
         return render_template('relay_update.html', user=current_user, relay_connections=[relay_info])
 
     elif request.method == 'POST':
-        id = request.form.get('id')
-        relay_info = db.session.get(RelayConnection, id)
-        relay_info.protocol = request.form.get('protocol')
-        relay_info.source_port = request.form.get('source_port')
-        relay_info.target_port = request.form.get('target_port')
-        relay_info.note = request.form.get('note')
+        rule_id = request.form.get('id')
+        relay_info = db.session.get(RelayConnection, rule_id)
+        if not relay_info:
+            logging.error("规则不存在！")
+            return redirect(url_for('relay_connections'))
 
-        db.session.commit()
+        # 获取表单字段
+        new_protocol = request.form.get('protocol')
+        new_source_port = request.form.get('source_port')
+        new_target_ip = request.form.get('target_ip')  # 允许修改目标IP
+        new_target_port = request.form.get('target_port')
+        new_note = request.form.get('note')
+
+        # 更新对象
+        relay_info.protocol = new_protocol
+        relay_info.source_port = new_source_port
+        relay_info.target_ip = new_target_ip
+        relay_info.target_port = new_target_port
+        relay_info.note = new_note
+
+        try:
+            db.session.commit()
+            logging.info(f"规则 {rule_id} 更新成功！协议: {new_protocol}, 源端口: {new_source_port}, 目标IP: {new_target_ip}, 目标端口: {new_target_port}")
+        except IntegrityError as e:
+            db.session.rollback()
+            # 判断是否为源端口唯一约束错误
+            if "UNIQUE constraint failed: relay_connections.source_port" in str(e):
+                logging.error(f"规则 {rule_id} 更新失败：源端口 {new_source_port} 已存在，无法更新！")
+            else:
+                logging.error(f"规则 {rule_id} 更新失败：数据库错误 {e}")
 
         return redirect(url_for('relay_connections'))
 
+@app.route('/relay_clone')
+@login_required
+def relay_clone():
+    relay_id = request.args.get('id')
+    if not relay_id:
+        flash("未指定要克隆的规则ID", "error")
+        return redirect(url_for('relay_connections'))
 
+    # 获取原始规则
+    original = db.session.get(RelayConnection, relay_id)
+    if not original:
+        flash(f"ID {relay_id} 的规则不存在", "error")
+        return redirect(url_for('relay_connections'))
+
+    try:
+        # 创建新对象（克隆）
+        cloned = RelayConnection(
+            protocol=original.protocol,
+            source_port=None,  # 这里需要手动分配新端口，否则 UNIQUE 会冲突
+            target_ip=original.target_ip,
+            target_port=original.target_port,
+            alive=original.alive,
+            info=original.info,
+            status=original.status,
+            note=original.note
+        )
+
+        # 自动分配一个可用 source_port（示例：+1 最大值，实际可按你的逻辑改）
+        max_port = db.session.query(db.func.max(RelayConnection.source_port)).scalar() or 60000
+        cloned.source_port = max_port + 1
+
+        db.session.add(cloned)
+        db.session.commit()
+        flash(f"规则ID {relay_id} 克隆成功，新ID: {cloned.id}", "success")
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"克隆规则失败: {e}")
+        flash(f"克隆规则失败: {e}", "error")
+
+    return redirect(url_for('relay_connections'))
 """
 
 relay_ip_select 路由处理函数
@@ -772,39 +855,23 @@ test_all_ports 路由处理函数用于处理 /test_all_ports 路由的 GET 请�
 """
 
 
+
 @app.route('/test_all_ports', methods=['GET', 'POST'])
 @login_required
 def test_all_ports():
     relay_connections = RelayConnection.query.all()
 
-    for connection in relay_connections:
-        target_ip = connection.target_ip
-        target_port = connection.target_port
+    # 使用线程池并行处理
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(test_single_connection, relay_connections))
 
-        try:
-            # 构造测试命令
-            test_command = [
-                "sudo", "-u", "xray",
-                "python3", "-c",
-                f"import socket; "
-                f"s = socket.create_connection(('{target_ip}', {target_port}), timeout=5); "
-                f"s.close()",
-            ]
+    # 更新数据库
+    for conn in results:
+        db.session.merge(conn)
+    db.session.commit()
 
-            # 运行测试命令
-            subprocess.run(test_command, check=True)
-
-        except (subprocess.CalledProcessError, socket.timeout, ConnectionRefusedError):
-            # 如果命令运行失败或连接超时或被拒绝，更新记录的 note 字段
-            update_status = "已关闭"
-            db.session.commit()
-            connection.status = f"{connection.note}\n{update_status}" if connection.note else update_status
-            # 抑制异常，继续测试下一个端口
-            logging.error(f"测试端口关闭: {target_ip}:{target_port}")
-
-    logging.info("成功测试并更新所有端口状态")
+    logging.info("成功测试并更新所有端口的 alive 和 info 状态（国家缩写）")
     return redirect(url_for('relay_connections'))
-
 
 """
 主机部分

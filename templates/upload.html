@@ -14,41 +14,40 @@
         }
 
         .signin-container {
-            background-color: rgba(232, 86, 41, 0.85);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            width: 520px;
+            background: linear-gradient(135deg, rgba(232, 86, 41, 0.85), rgba(255, 128, 64, 0.85));
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            max-width: 520px;
             margin: 10% auto;
-            padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
             color: white;
         }
 
         .form-control-file {
-            color: #333;
-            background-color: rgba(255, 255, 255, 0.95);
+            color: black;
+            background-color: white;
             padding: 10px;
-            border-radius: 8px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
             font-size: 14px;
             width: 100%;
         }
 
-        .btn {
-            border-radius: 999px;
-            background: linear-gradient(90deg, #ff5722, #ff784e);
+        .btn-custom {
+            border-radius: 5px;
+            font-weight: 600;
+            background-color: #e85629;
             color: white;
             border: none;
-            font-weight: 600;
-            font-size: 16px;
-            padding: 10px 0;
-            transition: all 0.3s ease;
+            padding: 10px 20px;
             width: 48%;
+            transition: background-color 0.3s ease;
         }
 
-        .btn:hover {
-            background: linear-gradient(90deg, #ff784e, #ff5722);
-            box-shadow: 0 0 12px rgba(255, 87, 34, 0.5);
+        .btn-custom:hover {
+            background-color: #cc4a24;
             color: white;
         }
 
@@ -70,6 +69,7 @@
             align-items: center;
             margin-bottom: 10px;
             font-size: 15px;
+            color: white;
         }
 
         .upload-steps i {
@@ -92,8 +92,8 @@
             <input type="file" name="file" class="form-control-file mb-3" accept=".xlsx">
             <input type="hidden" name="table_name" value="{{ table_name }}">
             <div class="button-container">
-                <button type="submit" class="btn">上传</button>
-                <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn">返回</button>
+                <button type="submit" class="btn-custom">上传</button>
+                <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn-custom">返回</button>
             </div>
         </form>
     </div>

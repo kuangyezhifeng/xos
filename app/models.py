@@ -53,9 +53,11 @@ class RelayConnection(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     protocol = db.Column(db.String(length=15), nullable=False)
-    source_port = db.Column(db.Integer, nullable=False)
+    source_port = db.Column(db.Integer, nullable=False, unique=True)
     target_ip = db.Column(db.String(length=15), nullable=False)
     target_port = db.Column(db.Integer, nullable=False)
+    alive = db.Column(db.Integer)
+    info = db.Column(db.Text)
     status = db.Column(db.String(length=15))
     note = db.Column(db.Text)
 

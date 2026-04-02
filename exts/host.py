@@ -705,39 +705,94 @@ def generate_and_save_configs(host_ip):
     return xray_config_file
 
 
+# def xray_remote_service_handler(remote_host):
+#     # 连接远程服务器
+#     try:
+#         ssh_client = paramiko.SSHClient()
+#         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+#         ssh_client.connect(hostname=remote_host)
+#
+#         # 检查Xray安装状态
+#         if get_xray_status(ssh_client):
+#             pass
+#         else:
+#             # 根据国家安装Xray
+#             result = get_country_code(ssh_client)
+#             if result == "CN":
+#                 china_install_xray(ssh_client)
+#             else:
+#                 foreign_install_xray(ssh_client)
+#
+#             # 写入远程Xray服务配置文件
+#             remote_xray_service_write(ssh_client)
+#
+#         # 生成和保存配置文件
+#         xray_config_file = generate_and_save_configs(remote_host)
+#         sync_xray_config(ssh_client, xray_config_file)
+#
+#         # 重启远程Xray服务
+#         restart_remote_xray(ssh_client)
+#
+#     except Exception as e:
+#         print(f"Error: {e}")
+#     finally:
+#         ssh_client.close()
 def xray_remote_service_handler(remote_host):
-    # 连接远程服务器
+    ssh_client = None
+
     try:
+        logging.info(f"开始处理服务器: {remote_host}")
+
+        # 创建SSH连接
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(hostname=remote_host)
 
-        # 检查Xray安装状态
+        ssh_client.connect(
+            hostname=remote_host,
+            timeout=10
+        )
+
+        logging.info("SSH连接成功")
+
+        # 检查Xray是否安装
         if get_xray_status(ssh_client):
-            pass
+            logging.info("Xray 已安装，跳过安装步骤")
         else:
-            # 根据国家安装Xray
+            logging.info("Xray 未安装，准备安装")
+
             result = get_country_code(ssh_client)
+
             if result == "CN":
+                logging.info("检测到中国服务器，使用国内安装源")
                 china_install_xray(ssh_client)
             else:
+                logging.info("使用Github安装源")
                 foreign_install_xray(ssh_client)
 
-            # 写入远程Xray服务配置文件
+            # 写入systemd服务
             remote_xray_service_write(ssh_client)
 
-        # 生成和保存配置文件
+        # 生成本地配置文件
+        logging.info("生成本地Xray配置")
         xray_config_file = generate_and_save_configs(remote_host)
+
+        # 同步配置文件
+        logging.info("同步配置到远程服务器")
         sync_xray_config(ssh_client, xray_config_file)
 
-        # 重启远程Xray服务
+        # 重启Xray
+        logging.info("重启Xray服务")
         restart_remote_xray(ssh_client)
 
-    except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        ssh_client.close()
+        logging.info(f"{remote_host} 部署完成")
 
+    except Exception as e:
+        logging.error(f"{remote_host} 部署失败: {e}")
+
+    finally:
+        if ssh_client:
+            ssh_client.close()
+            logging.info("SSH连接已关闭")
 
 def batch_proxies_set(protocol, addresses, port='10808', account=None, password=None):
     all_addresses = parse_ip_addresses(addresses)
@@ -874,7 +929,7 @@ def create_tc_limit(remote_host, proxies, max_retries=8):
             retries += 1
             time.sleep(1)
 
-    # 清理限速规则
+    # 清理限速规则i
     retries = 0
     tc_rules_clear = f"ssh {remote_host}  tc filter del dev {interface} parent 1: "
     while retries < max_retries:

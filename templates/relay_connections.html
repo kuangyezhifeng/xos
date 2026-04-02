@@ -1,221 +1,303 @@
 {% extends 'base.html' %}
+
 {% block styles %}
-    {{ super() }}
+{{ super() }}
+<style>
+    /* 序号圆点 */
+    .badge-number {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 8px;
+        background: linear-gradient(135deg, rgb(46, 44, 47), #2e2c2f);
+        color: #fff;
+        box-shadow: 0 0 6px rgba(119, 119, 111, 0.5);
+    }
 
-    <style>
-        /* 毛玻璃 + 白底半透明背景 */
-        .custom-table {
-            border-collapse: collapse !important;
-            background: rgba(255, 255, 255, 0.7); /* 白色半透明 */
-            backdrop-filter: blur(12px);
-            border-radius: 14px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            width: 100%;
-            color: #222; /* 黑色文字 */
-        }
+    /* 表格毛玻璃样式 */
+    .custom-table {
+        border-collapse: collapse !important;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(12px);
+        border-radius: 14px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        overflow: hidden;
+        width: 100%;
+        color: #222;
+    }
 
-        /* 单元格样式 */
-        .custom-table tbody td {
-            border-bottom: 1.5px solid rgba(0, 0, 0, 0.1);
-            border-right: 1px solid rgba(0, 0, 0, 0.1);
-            padding: 0.5rem 0.75rem;
-            vertical-align: middle !important;
-            color: #222; /* 黑字 */
-        }
+    .btn {
+        min-width: 30px;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
 
-        /* 去掉最后一列的右边框 */
-        .custom-table tr th:last-child,
-        .custom-table tr td:last-child {
-            border-right: none !important;
-        }
+    .btn:hover:not(.disabled) {
+        background-color: rgba(119,119,111,0.5);
+        border-color: rgba(119,119,111,0.5);
+        color: rgba(255,255,255,0.42);
+    }
 
-        /* badge 圆点数字，保持橙红渐变 */
-        .badge-number {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            font-weight: bold;
-            font-size: 8px;
-            background: linear-gradient(135deg, rgb(46, 44, 47), #2e2c2f);
-            color: #ffffff;
-            box-shadow: 0 0 6px rgba(119, 119, 111, 0.5);
-        }
+    .ml-2 {
+        margin-left: 0.5rem !important;
+    }
 
-        /* 按钮基础样式 */
-        .btn {
-            min-width: 50px;
-            font-weight: 400;
-            border-radius: 6px;
-            transition: all 0.3s ease;
-        }
+    .no-border {
+        border: none !important;
+    }
 
-        .btn:hover:not(.disabled) {
-            background-color: rgba(119, 119, 111, 0.5);
-            border-color: rgba(119, 119, 111, 0.5);
-            color: rgba(255, 255, 255, 0.42);
-        }
+    /* 多选图标样式 */
+    .select-toggle i {
+        cursor: pointer;
+        font-size: 16px;
+    }
 
-        .btn-primary {
-            background: linear-gradient(90deg, rgba(119, 119, 111, 0.5), rgba(119, 119, 111, 0.5));
-            border: none;
-            color: #08a808;
-            font-weight: 700;
-        }
+/* 按钮容器 */
+.action-buttons {
+    display: flex;
+    justify-content: center; /* 水平居中 */
+    gap: 36px;                /* 按钮间距 */
+    flex-wrap: nowrap;        /* 保证一字排开 */
+}
 
-        .btn-primary:hover {
-            background: linear-gradient(90deg, rgba(119, 119, 111, 0.5), rgba(119, 119, 111, 0.5));
-        }
+/* 保证多选框列宽小 */
+th:last-child, td:last-child {
+    width: 2.5%;             /* 或 2%，可根据图标大小微调 */
+    min-width: 30px;          /* 防止图标被压扁 */
+}
 
-        .ml-2 {
-            margin-left: 0.5rem !important;
-        }
+/* 闪烁绿灯 */
+@keyframes blink {
+  0%, 50%, 100% { opacity: 1; }
+  25%, 75% { opacity: 0.3; }
+}
+.green-blink {
+  color: #11cc11;       /* 鲜绿 */
+  animation: blink 2s infinite ease-in-out;
+}
 
-        .no-border {
-            border: none !important;
-        }
+/* 鲜红灯 */
+.red-light {
+  color: #cb0b0b;       /* 鲜红 */
+}
 
-    </style>
+/* 鲜黄色灯 */
+.yellow-light {
+  color: #02baf3;       /* 鲜黄 */
+}
+</style>
 {% endblock %}
 
 {% block content %}
-    <form method="post">
-        <table class="table table-hover custom-table">
-            <thead class="bg-dark text-white">
+<form method="post">
+    <table class="table table-hover custom-table">
+        <thead class="bg-dark text-white">
             <tr>
-                <th style="width: 6%;"><i class="fas fa-hashtag"></i> 编号</th>
-                <th style="width: 10%;"><i class="fas fa-network-wired"></i> 协议</th>
-                <th style="width: 10%;"><i class="fas fa-sign-in-alt"></i> 源端口</th>
-                <th style="width: 15%;"><i class="fas fa-arrow-right"></i> 目标 IP</th>
-                <th style="width: 10%;"><i class="fas fa-sign-out-alt"></i> 目标端口</th>
-                <th style="width: 20%;"><i class="fas fa-sticky-note"></i>备注</th>
-                <th style="width: 2%;"><i class="fas fa-edit" title="修改">修改</i></th>
-                <th style="width: 2%;"><i class="fas fa-power-off" title="启用/禁用"></i>启停</th>
-                <th style="width: 2%;">
-                    <i class="fas fa-check-square text-white me-1"></i>
-                    <input type="checkbox" id="select-all">
+                <th style="width:5%;"><i class="fas fa-hashtag me-1"></i>序号</th>
+                <th style="width:5%;"><i class="fas fa-exchange-alt me-1"></i>协议</th>
+                <th style="width:25%;"><i class="fas fa-network-wired me-1"></i>链路</th>
+<th style="width:5%;">
+    <i class="fas fa-circle me-1"></i> 活动
+</th>
+<th style="width:5%;">
+    <i class="fas fa-flag-usa text-white me-1"></i> 国家
+</th>
+                <th style="width:5%;"><i class="fas fa-file-alt me-1"></i>备注</th>
+                <th style="width:3%;"><i class="fas fa-toggle-on me-1"></i>启停</th>
+                <th style="width:3%;"><i class="fas fa-ellipsis-h me-1"></i>操作</th>
+                <th>
+                    <div class="form-check m-0 p-0 d-flex justify-content-center">
+                        <input type="checkbox" id="select-all">
+                    </div>
                 </th>
             </tr>
-            </thead>
-            <tbody>
+        </thead>
+        <tbody>
             {% for relay in connections.items %}
-                <tr>
-                    <td><span class="badge-number">{{ loop.index }}</span></td>
-                    <td>{{ relay.protocol }}</td>
-                    <td>{{ relay.source_port }}</td>
-                    <td>{{ relay.target_ip }}</td>
-                    <td>{{ relay.target_port }}</td>
+            <tr>
+                <td><span class="badge-number">{{ loop.index }}</span></td>
+                <td>
+                    {% set proto = relay.protocol.lower() %}
+                    <span class="badge badge-protocol
+                        {% if proto == 'tcp' %}bg-primary
+                        {% elif proto == 'udp' %}bg-success
+                        {% else %}bg-secondary{% endif %}">
+                        {{ relay.protocol }}
+                    </span>
+                </td>
+                <td>
+                    {{ relay.source_ip or "0.0.0.0" }}:{{ relay.source_port }}
+                    {% if relay.middle_ip %}→ {{ relay.middle_ip }}:{{ relay.middle_port }}{% endif %}
+                    → {{ relay.target_ip }}:{{ relay.target_port }}
+                </td>
+
 <td>
-  {% if relay.note %}
-      [{{ relay.note }}]
-  {% else %}
-      <i class="fas fa-file text-muted" title="无备注"></i>
-  {% endif %}
-</td>             <td>
-                        <a class="btn btn-success btn-sm" href="{{ url_for('relay_update', id=relay.id) }}"
-                           title="修改">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                    </td>
-                    <td>
-                        {% if relay.status == '1' %}
-                            <a class="btn btn-success btn-sm"
-                               href="{{ url_for('relay_on_off', type='off', id=relay.id) }}" title="启用">
-                                <i class="fas fa-toggle-on"></i>
-                            </a>
-                        {% elif relay.status == '已关闭' %}
-                            <a class="btn btn-danger btn-sm"
-                               href="{{ url_for('relay_on_off', type='off', id=relay.id) }}" title="已关闭">
-                                <i class="fas fa-toggle-off"></i>
-                            </a>
-                        {% else %}
-                            <a class="btn btn-warning btn-sm"
-                               href="{{ url_for('relay_on_off', type='on', id=relay.id) }}" title="禁用">
-                                <i class="fas fa-toggle-off"></i>
-                            </a>
-                        {% endif %}
-                    </td>
-                    <td class="text-center">
-                        <input type="checkbox" name="selected_items[]" value="{{ relay.id }}">
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-            <tfoot>
-            <tr class="bg-dark text-white">
-                <!-- 分页栏，7列合并，内容居中 -->
-                <td colspan="6" class="text-center">
-                    <span class="badge bg-secondary">第 {{ connections.page }} 页</span>
-                    {% if connections.has_prev %}
-                        <a class="btn btn-secondary btn-sm ms-2"
-                           href="{{ url_for('relay_connections', page=connections.prev_num) }}">
-                            <i class="fas fa-chevron-left"></i> 上一页
-                        </a>
-                    {% else %}
-                        <button class="btn btn-secondary btn-sm ms-2" disabled><i class="fas fa-chevron-left"></i> 上一页
-                        </button>
-                    {% endif %}
+    {% if relay.alive is not none %}
+        {% if relay.alive == 1 %}
+            <!-- 闪亮绿灯 -->
+            <span title="活动">
+                <i class="fas fa-circle fa-xs green-blink"></i>
+            </span>
+        {% else %}
+            <!-- 鲜红灯 -->
+            <span title="不通">
+                <i class="fas fa-circle fa-xs red-light"></i>
+            </span>
+        {% endif %}
+    {% else %}
+        <!-- 鲜黄色灯 -->
+        <span title="未知状态">
+            <i class="fas fa-circle fa-xs yellow-light"></i>
+        </span>
+    {% endif %}
+</td>
 
-                    {% for num in connections.iter_pages() %}
-                        {% if num %}
-                            {% if num != connections.page %}
-                                <a class="btn btn-secondary btn-sm ms-1"
-                                   href="{{ url_for('relay_connections', page=num) }}">{{ num }}</a>
-                            {% else %}
-                                <span class="btn btn-primary btn-sm ms-1">{{ num }}</span>
-                            {% endif %}
-                        {% else %}
-                            <span class="btn btn-secondary btn-sm ms-1 disabled">...</span>
-                        {% endif %}
-                    {% endfor %}
 
-                    {% if connections.has_next %}
-                        <a class="btn btn-secondary btn-sm ms-2"
-                           href="{{ url_for('relay_connections', page=connections.next_num) }}">
-                            下一页 <i class="fas fa-chevron-right"></i>
-                        </a>
+    <!-- info 字段 -->
+    <td>
+        {% if relay.info %}
+            [{{ relay.info }}]
+        {% else %}
+            <i class="fas fa-file text-muted" title="无信息"></i>
+        {% endif %}
+    </td>
+                <td>
+                    {% if relay.note %}
+                        [{{ relay.note }}]
                     {% else %}
-                        <button class="btn btn-secondary btn-sm ms-2" disabled>下一页 <i
-                                class="fas fa-chevron-right"></i></button>
+                        <i class="fas fa-file text-muted" title="无备注"></i>
                     {% endif %}
                 </td>
-
-                <!-- 启用选中 -->
-                <td class="text-center">
-                    <button type="submit" class="btn btn-success btn-sm"
-                            formaction="{{ url_for('relay_on_off', type='on') }}">
-                        <i class="fas fa-toggle-on"></i> 启用
-                    </button>
+                <td>
+                    {% if relay.status == '1' %}
+                        <a href="{{ url_for('relay_on_off', type='off', id=relay.id) }}" class="text-success" title="禁用">
+                            <i class="fas fa-toggle-on fa-lg"></i>
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('relay_on_off', type='on', id=relay.id) }}" class="text-warning" title="启用">
+                            <i class="fas fa-toggle-off fa-lg"></i>
+                        </a>
+                    {% endif %}
                 </td>
-
-                <!-- 禁用选中 -->
-                <td class="text-center">
-                    <button type="submit" class="btn btn-warning btn-sm"
-                            formaction="{{ url_for('relay_on_off', type='off') }}">
-                        <i class="fas fa-toggle-off"></i> 禁用
-                    </button>
+                <td>
+                    <div class="btn-group dropstart ms-2">
+                        <button type="button" class="btn btn-success btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">⋮</button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('relay_update', id=relay.id) }}"><i class="fas fa-edit me-2"></i>编辑</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('relay_clone', id=relay.id) }}"><i class="fas fa-clone me-2"></i>克隆</a></li>
+                            <li><a class="dropdown-item text-danger" href="{{ url_for('relay_on_off', type='delete', id=relay.id) }}"><i class="fas fa-trash-alt me-2"></i>删除</a></li>
+                        </ul>
+                    </div>
                 </td>
-
-                <!-- 删除选中 -->
-                <td class="text-center">
-                    <button type="submit" class="btn btn-danger btn-sm"
-                            formaction="{{ url_for('relay_on_off', type='delete') }}">
-                        <i class="fas fa-trash-alt"></i> 删除
-                    </button>
+                <td>
+                    <div class="form-check m-0 p-0 d-flex justify-content-center select-toggle">
+                        <i class="far fa-square text-secondary"></i>
+                        <input class="form-check-input d-none" type="checkbox" name="selected_items[]" value="{{ relay.id }}">
+                    </div>
                 </td>
             </tr>
-            </tfoot>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+    <tr class="bg-dark text-white">
+        <!-- 分页列，占前 6 列 -->
+        <td colspan="5" class="text-center">
+            <span class="badge bg-secondary">第 {{ connections.page }} 页</span>
 
-        </table>
-    </form>
+            {% if connections.has_prev %}
+                <a class="btn btn-secondary btn-sm ms-2" href="{{ url_for('relay_connections', page=connections.prev_num) }}">
+                    <i class="fas fa-chevron-left"></i> 上一页
+                </a>
+            {% else %}
+                <button class="btn btn-secondary btn-sm ms-2" disabled>
+                    <i class="fas fa-chevron-left"></i> 上一页
+                </button>
+            {% endif %}
 
-    <script>
-        document.getElementById('select-all').addEventListener('change', function () {
-            const checkboxes = document.querySelectorAll('input[name="selected_items[]"]');
-            checkboxes.forEach(cb => cb.checked = this.checked);
+            {% for num in connections.iter_pages() %}
+                {% if num %}
+                    {% if num != connections.page %}
+                        <a class="btn btn-secondary btn-sm ms-1" href="{{ url_for('relay_connections', page=num) }}">{{ num }}</a>
+                    {% else %}
+                        <span class="btn btn-primary btn-sm ms-1">{{ num }}</span>
+                    {% endif %}
+                {% else %}
+                    <span class="btn btn-secondary btn-sm ms-1 disabled">...</span>
+                {% endif %}
+            {% endfor %}
+
+            {% if connections.has_next %}
+                <a class="btn btn-secondary btn-sm ms-2" href="{{ url_for('relay_connections', page=connections.next_num) }}">
+                    下一页 <i class="fas fa-chevron-right"></i>
+                </a>
+            {% else %}
+                <button class="btn btn-secondary btn-sm ms-2" disabled>
+                    下一页 <i class="fas fa-chevron-right"></i>
+                </button>
+            {% endif %}
+        </td>
+
+        <!-- 多选操作按钮列 -->
+        <td colspan="4" >
+            <div class="action-buttons">
+                <button type="submit" class="btn btn-outline-success btn-sm d-flex align-items-center gap-1 px-3"
+                        formaction="{{ url_for('relay_on_off', type='on') }}">
+                    <i class="fas fa-circle-check"></i> <span>Socat</span>
+                </button>
+                <button type="submit" class="btn btn-outline-danger btn-sm d-flex align-items-center gap-1 px-3"
+                        formaction="{{ url_for('relay_on_off', type='off') }}">
+                    <i class="fas fa-circle-xmark"></i> <span>Socat</span>
+                </button>
+                <button type="submit" class="btn btn-outline-danger btn-sm d-flex align-items-center gap-1 px-3"
+                        formaction="{{ url_for('relay_on_off', type='delete') }}">
+                    <i class="fas fa-trash-alt"></i> <span>删除</span>
+                </button>
+            </div>
+        </td>
+    </tr>
+</tfoot>
+    </table>
+</form>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const selectAll = document.getElementById('select-all');
+    const rows = document.querySelectorAll('.select-toggle');
+
+    // 全选
+    selectAll?.addEventListener('change', function() {
+        rows.forEach(row => {
+            const icon = row.querySelector('i');
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            checkbox.checked = this.checked;
+            icon.classList.toggle('fa-check', this.checked);
+            icon.classList.toggle('fa-square', !this.checked);
+            icon.classList.toggle('text-success', this.checked);
+            icon.classList.toggle('text-secondary', !this.checked);
         });
-    </script>
+    });
+
+    // 单行切换
+    rows.forEach(row => {
+        row.addEventListener('click', e => {
+            e.preventDefault();
+            const icon = row.querySelector('i');
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            checkbox.checked = !checkbox.checked;
+            icon.classList.toggle('fa-check', checkbox.checked);
+            icon.classList.toggle('fa-square', !checkbox.checked);
+            icon.classList.toggle('text-success', checkbox.checked);
+            icon.classList.toggle('text-secondary', !checkbox.checked);
+
+            // 更新全选状态
+            selectAll.checked = Array.from(document.querySelectorAll('.select-toggle input[type="checkbox"]')).every(cb => cb.checked);
+        });
+    });
+});
+</script>
 {% endblock %}

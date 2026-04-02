@@ -4,8 +4,15 @@
     {{ super() }}
     <link href="/static/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
     <link rel="stylesheet" href="/static/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <link rel="icon" href="/static/images/favicon-16x16.png" sizes="16x16" type="image/png">
     <link rel="icon" href="/static/images/favicon-32x32.png" sizes="32x32" type="image/png">
+    <!-- Bootstrap CSS（你可能已经有了） -->
+{#    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">#}
+{#    <!-- Font Awesome（图标） -->#}
+{#    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">#}
+    <!-- Bootstrap JS Bundle（包含 Popper，必须加载） -->
+
 
     <style>
         /* 推荐字体组合：Montserrat + Open Sans */
@@ -121,9 +128,6 @@
                         <a class="dropdown-item" href="{{ url_for('system', exec_type='xray') }}">
                             <i class="fas fa-cogs mr-2 text-secondary"></i> 重置配置
                         </a>
-                        <a class="dropdown-item" href="{{ url_for('system', exec_type='database') }}">
-                            <i class="fas fa-trash-alt mr-2 text-danger"></i> <strong>清空数据</strong>
-                        </a>
                     </div>
                 </li>
 
@@ -167,9 +171,6 @@
                         <a class="dropdown-item" href="{{ url_for('import_excel_route', table_name='proxy_devices') }}">
                             <i class="fas fa-file-import mr-2 text-info"></i> 导入 EXCEL
                         </a>
-                        <a class="dropdown-item" href="{{ url_for('database', type='proxy') }}">
-                            <i class="fas fa-trash-alt mr-2 text-danger"></i> 清空代理
-                        </a>
                     </div>
                 </li>
 
@@ -184,16 +185,14 @@
                             <i class="fas fa-list mr-2 text-primary"></i> 中转清单
                         </a>
                         <a class="dropdown-item" href="{{ url_for('relay_connections',type='add') }}">
-                            <i class="fas fa-plus-circle mr-2 text-success"></i> SOCAT中转
+                            <i class="fas fa-plus-circle mr-2 text-success"></i> 添加规则
                         </a>
-                        <a class="dropdown-item" href="{{ url_for('relay_on_off',type='on') }}">
-                            <i class="fas fa-play-circle mr-2 text-success"></i> 启动中转
-                        </a>
+
                         <a class="dropdown-item" href="{{ url_for('test_all_ports') }}">
-                            <i class="fas fa-vial mr-2 text-info"></i> 测试中转
+                            <i class="fas fa-vial mr-2 text-info"></i> 目标信息
                         </a>
-                        <a class="dropdown-item" href="{{ url_for('relay_on_off',type='off') }}">
-                            <i class="fas fa-stop-circle mr-2 text-warning"></i> 禁用中转
+                        <a class="dropdown-item" href="{{ url_for('xray_forward') }}">
+                            <i class="fas fa-play-circle mr-2 text-success"></i> 启动转发
                         </a>
                         <a class="dropdown-item"
                            href="{{ url_for('export_excel_route', table_name='relay_connections') }}">
@@ -204,7 +203,7 @@
                             <i class="fas fa-file-import mr-2 text-info"></i> 导入 EXCEL
                         </a>
                         <a class="dropdown-item" href="{{ url_for('database',type='forward') }}">
-                            <i class="fas fa-trash-alt mr-2 text-danger"></i> 清空中转
+                            <i class="fas fa-trash-alt mr-2 text-danger"></i> 清空规则
                         </a>
                     </div>
                 </li>

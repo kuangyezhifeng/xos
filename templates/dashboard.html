@@ -69,26 +69,28 @@
         <table class="table custom-table table-bordered align-middle text-center" style="width: 100%;">
             <thead class="bg-dark text-white">
             <tr>
-                <th><i class="fas fa-hashtag text-white me-1"></i>编号</th>
-                <th><i class="fas fa-globe text-white me-1"></i>接入IP</th>
-                <th><i class="fas fa-user-secret text-white me-1"></i>代理IP</th>
-                <th><i class="fas fa-flag-usa text-white me-1"></i>国家</th>
-                <th><i class="fas fa-exchange-alt text-white me-1"></i>协议</th>
-                <th><i class="fas fa-route text-white me-1"></i>路由</th>
-                <th><i class="fas fa-network-wired text-white me-1"></i>网关</th>
-                <th><i class="fas fa-info-circle text-white me-1"></i>状态</th>
-                <th><i class="fas fa-wifi text-white me-1"></i>IP</th>
-                <th style="width: 18%">
+                <th style="width: 5%"><i class="fas fa-hashtag text-white me-1"></i>序号</th>
+                <th style="width: 5%"><i class="fas fa-globe text-white me-1"></i>接入IP</th>
+                <th style="width: 5%"><i class="fas fa-user-secret text-white me-1"></i>代理IP</th>
+                <th style="width: 5%"><i class="fas fa-flag-usa text-white me-1"></i>国家</th>
+                <th style="width: 5%"><i class="fas fa-exchange-alt text-white me-1"></i>协议</th>
+                <th style="width: 5%"><i class="fas fa-route text-white me-1"></i>路由</th>
+                <th style="width: 5%"><i class="fas fa-network-wired text-white me-1"></i>网关</th>
+                <th style="width: 5%"><i class="fas fa-info-circle text-white me-1"></i>状态</th>
+                <th style="width: 8%"><i class="fas fa-wifi text-white me-1"></i>IP</th>
+                <th style="width: 10%">
                     <i class="fas fa-link me-2 text-white"></i>连接
                 </th>
                 <th style="width: 8%"><i class="fas fa-link"></i>代理链</th>
                 <th style="width: 5%"><i class="fas fa-edit"></i>备注</th>
                 <th style="width: 5%"><i class="fas fa-wifi"></i>WiFi</th>
                 <th style="width: 5%"><i class="fas fa-power-off"></i>启停</th>
-                <th style="width: 2%;">
-                    <i class="fas fa-check-square text-white me-1"></i>
-                    <input type="checkbox" id="select-all">
-                </th>
+<th style="width: 2%;">
+    <div class="form-check m-0 p-0 d-flex justify-content-center">
+        <input type="checkbox" id="select-all">
+    </div>
+
+</th>
             </tr>
             </thead>
             <tbody>
@@ -194,10 +196,12 @@
                         {% endif %}
                     </td>
                     <td>
-                        <div class="form-check m-0 p-0 d-flex justify-content-center">
-                            <input class="form-check-input" type="checkbox" name="selected_items[]"
-                                   value="{{ proxy.id }}">
-                        </div>
+
+                        <div class="form-check m-0 p-0 d-flex justify-content-center select-toggle">
+                        <i class="far fa-square text-secondary"></i>
+                        <input class="form-check-input d-none" type="checkbox" name="selected_items[]"
+                               value="{{ proxy.id }}">
+                    </div>
                     </td>
                 </tr>
             {% endfor %}
@@ -269,31 +273,75 @@
             </tbody>
         </table>
     </form>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // 1. 文本截断
+    document.querySelectorAll(".shorten-text").forEach(tdElement => {
+        const originalText = tdElement.textContent;
+        const truncatedText = originalText.substring(0, 45);
+        tdElement.textContent = truncatedText;
+        tdElement.title = originalText;
+    });
 
-    <script>
-        document.getElementById('select-all').addEventListener('change', function () {
-            const checkboxes = document.querySelectorAll('input[name="selected_items[]"]');
-            checkboxes.forEach(cb => cb.checked = this.checked);
+    // 2. 多选图标和全选
+    const selectAll = document.getElementById('select-all');
+    const rows = document.querySelectorAll('.select-toggle');
+
+    // 全选
+    selectAll?.addEventListener('change', function() {
+        rows.forEach(row => {
+            const icon = row.querySelector('i');
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            checkbox.checked = this.checked;
+            if(this.checked){
+                icon.classList.remove('fa-square', 'text-secondary');
+                icon.classList.add('fa-check', 'text-success');
+            } else {
+                icon.classList.remove('fa-check', 'text-success');
+                icon.classList.add('fa-square', 'text-secondary');
+            }
         });
+    });
 
-        function copyText(element) {
-            var tempInput = document.createElement("input");
-            tempInput.value = element.getAttribute("data-full-text");
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            document.execCommand("copy");
-            document.body.removeChild(tempInput);
-            alert("已复制到剪贴板：" + tempInput.value);
-        }
+    // 单行点击切换
+    rows.forEach(row => {
+        row.addEventListener('click', e => {
+            e.preventDefault();
+            const icon = row.querySelector('i');
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            checkbox.checked = !checkbox.checked;
+            if(checkbox.checked){
+                icon.classList.remove('fa-square', 'text-secondary');
+                icon.classList.add('fa-check', 'text-success');
+            } else {
+                icon.classList.remove('fa-check', 'text-success');
+                icon.classList.add('fa-square', 'text-secondary');
+            }
 
-        document.addEventListener("DOMContentLoaded", function () {
-            var tdElements = document.querySelectorAll(".shorten-text");
-            tdElements.forEach(function (tdElement) {
-                var originalText = tdElement.textContent;
-                var truncatedText = originalText.substring(0, 45);
-                tdElement.textContent = truncatedText;
-                tdElement.title = originalText;
-            });
+            // 更新全选状态
+            selectAll.checked = Array.from(document.querySelectorAll('.select-toggle input[type="checkbox"]'))
+                                     .every(cb => cb.checked);
         });
-    </script>
+    });
+});
+
+// 3. 复制函数
+function copyText(element) {
+    const text = element.getAttribute("data-full-text");
+    if(navigator.clipboard){
+        navigator.clipboard.writeText(text).then(() => {
+            alert("已复制到剪贴板：" + text);
+        });
+    } else {
+        // 兼容老浏览器
+        const tempInput = document.createElement("input");
+        tempInput.value = text;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempInput);
+        alert("已复制到剪贴板：" + text);
+    }
+}
+</script>
 {% endblock %}
