@@ -3342,10 +3342,13 @@ def generate_xray_forward(relay_connections, selected_nodes=None):
     outbound_tags = []
     routing_rules = []
     routing_balancers = []
-
     for relay in relay_connections:
         # 只处理启用状态
         if relay.status not in (None, '', 0, '0'):
+            continue
+
+        # 只允许 TCP，UDP 直接跳过
+        if relay.protocol != "tcp":
             continue
 
         # 防止端口重复
@@ -3359,11 +3362,11 @@ def generate_xray_forward(relay_connections, selected_nodes=None):
             "tag": tag,
             "port": relay.source_port,
             "listen": "0.0.0.0",
-            "protocol": "dokodemo-door",
+            "protocol": "tunnel",
             "settings": {
                 "address": relay.target_ip,
                 "port": relay.target_port,
-                "network": "tcp,udp" if relay.protocol == "tcp" else "udp"
+                "network": "tcp"  # 只保留 TCP
             }
         }
 
