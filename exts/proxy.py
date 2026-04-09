@@ -3504,28 +3504,66 @@ def fetch_country(ip):
     return "未知"
 
 
-def test_single_connection(connection):
-    """测试单个 TCP 端口并获取 IP 信息（只提取国家缩写）"""
+def test_single_connection(connection, retries=3):
     target_ip = connection.target_ip
     target_port = connection.target_port
 
     if getattr(connection, 'protocol', 'tcp') == 'tcp':
-        try:
-            s = socket.create_connection((target_ip, target_port), timeout=5)
-            s.close()
-            connection.alive = 1
-            logging.info(f"测试端口活动: {target_ip}:{target_port}")
-        except (socket.timeout, ConnectionRefusedError, OSError):
-            connection.alive = 0
-            logging.error(f"测试端口关闭: {target_ip}:{target_port}")
+
+        for attempt in range(retries):
+
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(10)
+
+                s.connect((target_ip, target_port))
+                s.close()
+
+                connection.alive = 1
+
+                logging.info(
+                    f"端口开放: {target_ip}:{target_port}"
+                )
+
+                break
+
+            except socket.timeout:
+
+                logging.warning(
+                    f"超时(第{attempt+1}次): {target_ip}:{target_port}"
+                )
+
+                if attempt == retries - 1:
+                    connection.alive = 0
+
+                else:
+                    time.sleep(1)
+
+            except ConnectionRefusedError:
+
+                connection.alive = 0
+
+                logging.info(
+                    f"端口关闭(拒绝): {target_ip}:{target_port}"
+                )
+
+                break
+
+            except OSError as e:
+
+                logging.error(
+                    f"连接错误 {e}: {target_ip}:{target_port}"
+                )
+
+                connection.alive = 0
+                break
+
     else:
-        # UDP 不检测端口
-        connection.alive = 1  # 标记为 UDP 未检测
+        connection.alive = 2  # UDP 未检测
 
-    # 获取 IP 国家缩写
     connection.info = fetch_country(target_ip)
-    return connection
 
+    return connection
 
 """
 relay_ip_route_set 函数
