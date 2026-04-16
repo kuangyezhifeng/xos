@@ -3,6 +3,7 @@
 {% block styles %}
     {{ super() }}
     <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+
     <style>
         body {
             background: url('/static/images/wildlee.svg') no-repeat center top;
@@ -12,7 +13,7 @@
         }
 
         .signin-container {
-            background: rgba(232, 86, 41, 0.85); /* 橘红毛玻璃感 */
+            background: rgba(232, 86, 41, 0.85);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             width: 520px;
@@ -28,11 +29,6 @@
             background-color: rgba(255, 255, 255, 0.95);
             color: black;
             font-size: 14px;
-            line-height: 1.5;
-        }
-
-        .form-control::placeholder {
-            color: #888;
         }
 
         .btn {
@@ -40,15 +36,13 @@
             background: linear-gradient(90deg, #ff5722, #ff784e);
             color: white;
             border: none;
-            padding: 8px 16px; /* 缩小内边距让按钮大小更紧凑 */
+            padding: 8px 16px;
             font-weight: 600;
-            transition: all 0.3s ease;
         }
 
         .btn:hover {
             background: linear-gradient(90deg, #ff784e, #ff5722);
             box-shadow: 0 0 12px rgba(255, 87, 34, 0.5);
-            color: white;
         }
 
         .button-container {
@@ -59,58 +53,77 @@
         }
 
         .col-form-label {
-            text-align: left !important;
             color: white;
         }
 
         .hint-text {
             font-size: 13px;
             color: #fbe1d1;
-            margin-top: 10px;
         }
 
         .flashes {
             list-style: none;
             padding-left: 0;
-            margin-bottom: 15px;
             color: #fff9e1;
-            font-weight: bold;
         }
 
         textarea {
             resize: vertical;
         }
+
+        hr {
+            border-color: rgba(255,255,255,0.3);
+        }
     </style>
 {% endblock %}
 
 {% block content %}
-    <div class="signin-container">
-        <form class="form-horizontal" method="post" action="{{ url_for('bind_device', id=id) }}">
-            <div class="form-group">
-                <label for="mytextarea" class="control-label">[IP 地址列表]</label>
 
-                {% with messages = get_flashed_messages() %}
-                    {% if messages %}
-                        <ul class="flashes">
-                            {% for message in messages %}
-                                <li>{{ message }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                {% endwith %}
+<div class="signin-container">
 
-                <textarea name="mytextarea" class="form-control mx-auto" rows="12"
-                          placeholder="每个 IP 地址或网络独立一行，请注意换行！">{% for ip in ips.split(',') %}{{ ip.strip() }}
-{% endfor %}</textarea>
+    <form method="post" action="{{ url_for('bind_device', id=id) }}">
 
-                <p class="hint-text mt-3">提示：每个 IP 地址或网段请占一行，并注意换行。</p>
-                <label class="col-form-label">示例：192.168.0.0/24 或 192.168.1.5</label>
+        <label>源 IP（Source IP）</label>
 
-                <div class="button-container">
-                    <button type="submit" class="btn col-sm-5">确认绑定</button>
-                    <button type="button" onclick="window.location='{{ url_for('dashboard') }}'" class="btn col-sm-5">返回主页</button>
-                </div>
-            </div>
-        </form>
-    </div>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <!-- 源IP -->
+        <textarea name="source_ips"
+                  class="form-control"
+                  rows="6"
+                  placeholder="192.168.1.0/24">{{ source_ips or '' }}</textarea>
+
+        <p class="hint-text">源IP：客户端 / 内网IP（支持 CIDR）</p>
+
+        <hr>
+
+        <label>目标 IP（Destination IP）</label>
+
+        <!-- 目标IP -->
+        <textarea name="dest_ips"
+                  class="form-control"
+                  rows="6"
+                  placeholder="8.8.8.8">{{ dest_ips or '' }}</textarea>
+
+        <p class="hint-text">目标IP：访问的服务器地址（如 8.8.8.8 / 1.1.1.1）</p>
+
+        <div class="button-container">
+            <button type="submit" class="btn col-sm-5">确认绑定</button>
+            <button type="button"
+                    onclick="window.location='{{ url_for('dashboard') }}'"
+                    class="btn col-sm-5">返回主页</button>
+        </div>
+
+    </form>
+
+</div>
+
 {% endblock %}

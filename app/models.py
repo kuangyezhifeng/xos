@@ -38,6 +38,8 @@ class ProxyDevice(db.Model):
     protocol = db.Column(db.String(length=15))
     status = db.Column(db.String(length=15))
     device_ip = db.Column(db.String(length=65535))
+    # ⭐ 新增：目标IP
+    dest_ip = db.Column(db.String(length=65535))
     tag = db.Column(db.String(length=15))
     flag = db.Column(db.Integer)
     note = db.Column(db.String(length=255))

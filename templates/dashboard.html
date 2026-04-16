@@ -77,13 +77,18 @@
                 <th style="width: 5%"><i class="fas fa-route text-white me-1"></i>路由</th>
                 <th style="width: 5%"><i class="fas fa-network-wired text-white me-1"></i>网关</th>
                 <th style="width: 5%"><i class="fas fa-info-circle text-white me-1"></i>状态</th>
-                <th style="width: 8%"><i class="fas fa-wifi text-white me-1"></i>IP</th>
-                <th style="width: 10%">
+                <th style="width: 8%">
+                    <i class="fas fa-sign-in-alt text-white me-1"></i> Source
+                </th>
+                <th style="width: 8%">
+                    <i class="fas fa-sign-out-alt text-white me-1"></i> Dest
+                </th>
+                                <th style="width: 5%">
                     <i class="fas fa-link me-2 text-white"></i>连接
                 </th>
                 <th style="width: 8%"><i class="fas fa-link"></i>代理链</th>
                 <th style="width: 5%"><i class="fas fa-edit"></i>备注</th>
-                <th style="width: 5%"><i class="fas fa-wifi"></i>WiFi</th>
+                <th style="width: 5%"><i class="fas fa-project-diagram"></i>规则</th>
                 <th style="width: 5%"><i class="fas fa-power-off"></i>启停</th>
 <th style="width: 2%;">
     <div class="form-check m-0 p-0 d-flex justify-content-center">
@@ -144,6 +149,10 @@
                     </td>
                     <td class="shorten-text" data-full-text="{{ proxy.device_ip or '' }}"
                         onclick="copyText(this)">{{ proxy.device_ip or '' }}</td>
+
+                    <td class="shorten-text" data-full-text="{{ proxy.dest_ip or '' }}"
+                        onclick="copyText(this)">{{ proxy.dest_ip or '' }}</td>
+
                     <td class="shorten-text" data-full-text="{{ proxy.proxy_url }}"
                         onclick="copyText(this)">{{ proxy.proxy_url }}</td>
                     <td>
@@ -278,7 +287,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // 1. 文本截断
     document.querySelectorAll(".shorten-text").forEach(tdElement => {
         const originalText = tdElement.textContent;
-        const truncatedText = originalText.substring(0, 45);
+        const truncatedText = originalText.substring(0, 15);
         tdElement.textContent = truncatedText;
         tdElement.title = originalText;
     });

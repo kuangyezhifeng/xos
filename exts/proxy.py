@@ -665,9 +665,10 @@ def gateway_route_set():
     if enable_health_check and replaced_tags:
         xray_config["observatory"] = {
             "subjectSelector": replaced_tags,
-            "probeUrl": "http://connect.rom.miui.com/generate_204",
+            "probeUrl": "https://www.apple.com/library/test/success.html",
             "probeInterval": "100s",
-            "enableConcurrency": True,
+            "probeTimeout": "3s",
+            "enableConcurrency": False
         }
     else:
         xray_config.pop("observatory", None)
@@ -2590,22 +2591,19 @@ tag: 出站标签，用于识别设备的出站配置。
 """
 
 
-def generate_device_route(ip_string, tag):
-    if ip_string:
-        # 如果 ip_string 存在，将其分割成 IP 地址列表
-        ip_list = [ip.strip() for ip in ip_string.split(",")]
-        route_config = {
-            "type": "field",
-            "source": ip_list,
-            "outboundTag": f"{tag}",
-        }
-    else:
-        # 如果 ip_string 不存在，则清除 IP 地址路由出站规则
-        xray_route_remove(tag, "source")
+def generate_device_route(ip_list, tag, match_type):
+
+    if not ip_list:
+        xray_route_remove(tag, match_type)
         return None
 
-    return route_config
+    route_config = {
+        "type": "field",
+        match_type: ip_list,
+        "outboundTag": tag
+    }
 
+    return route_config
 
 """
 xray_route_rule(route_dict, match_type, config_path=CONFIG_PATH): 该函数用于添加或更新Xray的路由规则，接受三个参数：
@@ -2734,42 +2732,101 @@ raw_text: 包含设备IP地址的原始文本。
 """
 
 
-def xray_device_route_handler(proxys, raw_text):
-    ip_addresses = get_device_addresses(raw_text)
+def xray_device_route_handler(proxys, source_text, dest_text):
 
-    # 查询数据库中所有的记录,下面的功能主要解决添加IP被其它的代理绑定，这样可以清理掉数据库中已经存在于别的代理的设备IP
+    logging.info("🚀 [START] 开始处理 IP 路由绑定请求")
+
+    source_ips = get_device_addresses(source_text or "")
+    dest_ips = get_device_addresses(dest_text or "")
+
+    logging.info(f"📥 解析源IP数量: {len(source_ips)} - {source_ips}")
+    logging.info(f"📥 解析目标IP数量: {len(dest_ips)} - {dest_ips}")
+
+    # ===== 清理 source 冲突 =====
+    logging.info("🧹 开始清理 source IP 冲突绑定")
+
     all_proxy_records = ProxyDevice.query.all()
 
-    # 遍历所有记录
+    conflict_count = 0
+
     for proxy in all_proxy_records:
-        # 如果记录的device_ip字段不为空，则进行处理
+
         if proxy.device_ip:
-            # 将记录的device_ip字段中的值按逗号分隔为列表
+
             device_ips = proxy.device_ip.split(",")
-            # 移除匹配到的IP地址
-            updated_ips = [ip for ip in device_ips if ip not in ip_addresses]
-            # 更新device_ip字段为移除匹配到的IP地址后的值
+
+            updated_ips = [
+                ip for ip in device_ips
+                if ip not in source_ips
+            ]
+
+            if len(updated_ips) != len(device_ips):
+                conflict_count += 1
+                logging.warning(
+                    f"⚠️ 移除冲突IP: proxy_id={proxy.id}, "
+                    f"removed={set(device_ips) - set(updated_ips)}"
+                )
+
             proxy.device_ip = ",".join(updated_ips) if updated_ips else None
 
-    # 提交更改到数据库
     db.session.commit()
 
-    # 更新数据库
-    proxys.device_ip = ",".join(ip_addresses) or None
+    logging.info(f"🧹 source 冲突清理完成，共影响 {conflict_count} 条记录")
+
+    # ===== 写入数据库 =====
+    logging.info("💾 写入数据库 IP 绑定关系")
+
+    proxys.device_ip = ",".join(source_ips) if source_ips else None
+    proxys.dest_ip = ",".join(dest_ips) if dest_ips else None
+
     db.session.commit()
 
-    # 重新获取数据库中最新的 device_ip 和 tag 值
-    device_ip = proxys.device_ip
+    logging.info(
+        f"💾 数据库存储完成 | "
+        f"source={proxys.device_ip} | "
+        f"dest={proxys.dest_ip} | "
+        f"tag={proxys.tag}"
+    )
+
     tag = proxys.tag
-    protocol = proxys.protocol
-    route_dict = generate_device_route(device_ip, tag)
 
-    if route_dict:
-        xray_route_rule(route_dict, "source")
+    # ===== 生成 source 规则 =====
+    if source_ips:
 
-        logging.info(f"✅添加设备路由规则成功：{device_ip}-出站路由：{tag}")
+        logging.info(f"⚙️ 生成 source 路由规则: {source_ips}")
+
+        source_route = generate_device_route(
+            source_ips,
+            tag,
+            "source"
+        )
+
+        xray_route_rule(source_route, "source")
+
+        logging.info("✅ source 路由规则写入成功")
+
     else:
-        logging.error(f"添加设备路由规则失败：{device_ip}-出站路由：{tag}")
+        logging.info("ℹ️ 未提供 source IP，跳过 source 规则")
+
+    # ===== 生成 dest 规则 =====
+    if dest_ips:
+
+        logging.info(f"⚙️ 生成 destination 路由规则: {dest_ips}")
+
+        dest_route = generate_device_route(
+            dest_ips,
+            tag,
+            "ip"
+        )
+
+        xray_route_rule(dest_route, "ip")
+
+        logging.info("✅ destination 路由规则写入成功")
+
+    else:
+        logging.info("ℹ️ 未提供 destination IP，跳过 dest 规则")
+
+    logging.info("🏁 [END] IP 路由绑定处理完成")
 
     return {"success": True, "message": "IP地址更新成功"}
 
