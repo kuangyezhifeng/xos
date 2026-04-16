@@ -40,6 +40,8 @@ XRAY = "/etc/systemd/system/xray.service"
 XRAY_CHECK = "/etc/systemd/system/xray-check.service"
 INVALID_URL_MESSAGE = "无效的连接URL"
 EXISTING_OUTBOUND_MESSAGE = "已存在相同的出站配置"
+CONFIG_DIR = "/usr/local/xos/xray/socat_configs"
+SERVICE_TEMPLATE = "socat-forward@{}.service"
 TPROXY_PORT = 12345
 TPROXY_IP = "127.0.0.1"
 test_result = {}
@@ -3214,27 +3216,42 @@ socat_process_kill 函数用于终止中继连接规则的 socat 进程。该函
 
 
 def socat_process_kill(relay_connection):
-    # 获取中转规则信息
+    """停止一个转发规则（停止 systemd 服务并清理配置）"""
     source_port = relay_connection.source_port
+    service_name = SERVICE_TEMPLATE.format(source_port)
+    config_path = os.path.join(CONFIG_DIR, f"{source_port}.conf")
 
-    # 构造命令来获取匹配的 socat 进程
-    ss_command = f"pkill -f LISTEN:{source_port}"
+    # 1. 停止 systemd 服务实例
+    try:
+        subprocess.run(
+            ["systemctl", "stop", service_name],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        logging.info(f"🛑 已停止 systemd 服务 {service_name}")
+    except subprocess.CalledProcessError as e:
+        # 如果服务本来就没在运行，不算严重错误
+        logging.warning(f"停止服务 {service_name} 失败（可能已停止）: {e.stderr.strip()}")
 
-    # 使用 subprocess 执行命令并获取输出
-    process_pid = subprocess.getstatusoutput(ss_command)[1]
-    os.system(ss_command)
-    if process_pid:
-        # 杀死匹配的 socat 进程
+    # 2. 删除对应的配置文件（可选但推荐）
+    if os.path.exists(config_path):
         try:
-            subprocess.run(f"kill {process_pid}", shell=True)
-            logging.info(f"✅成功杀死 socat 进程，进程 ID： {process_pid}")
+            os.remove(config_path)
+            logging.info(f"🗑️ 已删除配置文件 {config_path}")
+        except Exception as e:
+            logging.error(f"删除配置文件失败 {config_path}: {e}")
 
-        except subprocess.CalledProcessError:
-            logging.info(f"✅进程 {process_pid} 不存在，无需杀死")
-    else:
-        logging.info(f"✅无法获取 socat 进程的 PID，无法杀死进程")
-
-
+    # 3. （可选）禁用开机自启（如果之前设置了 enable）
+    try:
+        subprocess.run(
+            ["systemctl", "disable", service_name],
+            check=False,  # 不检查返回码，因为可能未 enable
+            capture_output=True,
+            text=True
+        )
+    except Exception:
+        pass
 """
 relay_connection_on 函数
 功能描述：
@@ -3262,31 +3279,44 @@ def relay_connection_on(relay_connection):
     target_port = relay_connection.target_port
     protocol = relay_connection.protocol.lower()
 
+    # 构造 socat 参数
     if protocol == "udp":
-        cmd = [
-            "socat",
-            "-T",
-            "30",
-            "-d",
-            f"UDP4-LISTEN:{source_port},reuseaddr,fork",
-            f"UDP4:{target_ip}:{target_port}",
-        ]
+        listen_spec = f"UDP4-LISTEN:{source_port},reuseaddr,fork"
+        target_spec = f"UDP4:{target_ip}:{target_port}"
+        extra_opts = "-T 30"
     else:
-        cmd = [
-            "socat",
-            "-d",
-            f"TCP4-LISTEN:{source_port},reuseaddr,fork",
-            f"TCP4:{target_ip}:{target_port}",
-        ]
+        listen_spec = f"TCP4-LISTEN:{source_port},reuseaddr,fork"
+        target_spec = f"TCP4:{target_ip}:{target_port}"
+        extra_opts = ""
 
+    # 写入配置文件
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    config_path = os.path.join(CONFIG_DIR, f"{source_port}.conf")
     try:
-        subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            preexec_fn=os.setsid,
-        )
+        with open(config_path, "w") as f:
+            f.write(f"LISTEN_SPEC='{listen_spec}'\n")
+            f.write(f"TARGET_SPEC='{target_spec}'\n")
+            f.write(f"SOCAT_OPTS='-d {extra_opts}'\n")
+    except Exception as e:
+        logging.error(f"❌ 写入配置文件失败 {config_path}: {e}")
+        return
 
+    # 启动 systemd 服务
+    service_name = SERVICE_TEMPLATE.format(source_port)
+    try:
+        subprocess.run(
+            ["systemctl", "start", service_name],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+    except subprocess.CalledProcessError as e:
+        logging.error(f"❌ 启动 systemd 服务失败 {service_name}: {e.stderr}")
+        os.remove(config_path)
+        return
+
+    # 测试端口连通性（保留原逻辑）
+    try:
         if protocol == "udp":
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.settimeout(1)
@@ -3295,12 +3325,10 @@ def relay_connection_on(relay_connection):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(1)
                 s.connect((target_ip, target_port))
-
-        logging.info(f"✅ 成功启动 socat 进程，中转规则：{' '.join(cmd)}")
-    except subprocess.CalledProcessError:
-        logging.error(f"❌ 启动 socat 进程失败，中转规则：{' '.join(cmd)}")
+        logging.info(f"✅ 成功启动 socat 转发（systemd 托管），源端口 {source_port} -> {target_ip}:{target_port} ({protocol})")
     except (socket.error, socket.timeout) as e:
-        logging.error(f"❌ 端口未打开，中转规则：{' '.join(cmd)}，错误：{e}")
+        logging.warning(f"⚠️ 端口连通性测试失败，但转发服务已启动。规则: {source_port} -> {target_ip}:{target_port}，错误: {e}")
+
 
 
 def generate_xray_forward(relay_connections, selected_nodes=None):
@@ -3478,92 +3506,55 @@ def install_or_restart_service(service_name="xray_forward"):
         logging.info(f"服务 {service_name} 安装并启动完成。")
 
 
+API_LIST = [
+    "https://ipinfo.io/{ip}/json",
+    "http://ip-api.com/json/{ip}",
+    "https://ipwhois.app/json/{ip}",
+]
+
 def fetch_country(ip):
-    """获取 IP 的国家缩写，多个 API fallback"""
+    """获取 IP 的国家缩写（线程安全）"""
     for api in API_LIST:
         try:
-            url = api.format(ip=ip)
-            r = requests.get(url, timeout=5)
+            r = requests.get(api.format(ip=ip), timeout=5)
             if r.status_code == 200:
                 data = r.json()
-                if not isinstance(data, dict):
-                    continue
-
-                # ipinfo.io 返回 "country": "VN"
                 if "country" in data:
                     return data["country"].upper()
-                # ip-api.com 返回 "countryCode": "VN"
                 if "countryCode" in data:
                     return data["countryCode"].upper()
-                # ipwhois.app 返回 "country_code": "VN"
                 if "country_code" in data:
                     return data["country_code"].upper()
         except Exception as e:
             logging.warning(f"API {api} 查询 {ip} 失败: {e}")
-        time.sleep(0.1)  # 调速，避免同时请求太快
+        time.sleep(0.1)
     return "未知"
 
-
-def test_single_connection(connection, retries=3):
-    target_ip = connection.target_ip
-    target_port = connection.target_port
-
-    if getattr(connection, 'protocol', 'tcp') == 'tcp':
-
+def test_connection(target_ip, target_port, protocol='tcp', retries=3):
+    """
+    测试单个连接（纯函数，不依赖 ORM 对象）
+    返回: (alive, info)
+    """
+    if protocol == 'tcp':
         for attempt in range(retries):
-
             try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(10)
-
-                s.connect((target_ip, target_port))
-                s.close()
-
-                connection.alive = 1
-
-                logging.info(
-                    f"端口开放: {target_ip}:{target_port}"
-                )
-
-                break
-
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(10)
+                    s.connect((target_ip, target_port))
+                logging.info(f"端口开放: {target_ip}:{target_port}")
+                return 1, fetch_country(target_ip)
             except socket.timeout:
-
-                logging.warning(
-                    f"超时(第{attempt+1}次): {target_ip}:{target_port}"
-                )
-
+                logging.warning(f"超时(第{attempt+1}次): {target_ip}:{target_port}")
                 if attempt == retries - 1:
-                    connection.alive = 0
-
-                else:
-                    time.sleep(1)
-
-            except ConnectionRefusedError:
-
-                connection.alive = 0
-
-                logging.info(
-                    f"端口关闭(拒绝): {target_ip}:{target_port}"
-                )
-
-                break
-
-            except OSError as e:
-
-                logging.error(
-                    f"连接错误 {e}: {target_ip}:{target_port}"
-                )
-
-                connection.alive = 0
-                break
-
+                    return 0, fetch_country(target_ip)
+                time.sleep(1)
+            except (ConnectionRefusedError, OSError) as e:
+                logging.info(f"端口关闭: {target_ip}:{target_port} ({e})")
+                return 0, fetch_country(target_ip)
     else:
-        connection.alive = 2  # UDP 未检测
+        # UDP 未检测
+        return 2, fetch_country(target_ip)
 
-    connection.info = fetch_country(target_ip)
-
-    return connection
 
 """
 relay_ip_route_set 函数

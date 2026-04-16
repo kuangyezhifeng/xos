@@ -5,6 +5,8 @@ import logging
 from flask import render_template, send_file, request, jsonify
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from flask_migrate import Migrate
+from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
 from exts.host import *
 from exts.hysteria2 import *
 from exts.log_handler import *
@@ -858,25 +860,43 @@ test_all_ports 路由处理函数用于处理 /test_all_ports 路由的 GET 请�
 @app.route('/test_all_ports', methods=['GET', 'POST'])
 @login_required
 def test_all_ports():
-    relay_connections = RelayConnection.query.all()
+    # 1. 查询所有连接，但只提取必要字段（不将 ORM 对象传入线程）
+    connections = RelayConnection.query.all()
+    tasks = [(c.id, c.target_ip, c.target_port, getattr(c, 'protocol', 'tcp')) for c in connections]
 
-    # 使用线程池并行处理
+    # 2. 使用线程池并行测试
     with ThreadPoolExecutor(max_workers=10) as executor:
-        results = list(executor.map(test_single_connection, relay_connections))
+        # 提交任务并映射到 id
+        future_to_id = {
+            executor.submit(test_connection, ip, port, proto): conn_id
+            for conn_id, ip, port, proto in tasks
+        }
+        results = {}
+        for future in concurrent.futures.as_completed(future_to_id):
+            conn_id = future_to_id[future]
+            try:
+                alive, info = future.result()
+                results[conn_id] = (alive, info)
+            except Exception as e:
+                logging.error(f"测试连接 ID {conn_id} 时出错: {e}")
+                results[conn_id] = (0, "错误")
 
-    # 更新数据库
-    for conn in results:
-        db.session.merge(conn)
+    # 3. 主线程批量更新数据库（只更新 alive 和 info 字段）
+    for conn_id, (alive, info) in results.items():
+        RelayConnection.query.filter_by(id=conn_id).update({
+            'alive': alive,
+            'info': info
+        })
     db.session.commit()
 
-    logging.info("成功测试并更新所有端口的 alive 和 info 状态（国家缩写）")
+    logging.info("成功测试并更新所有端口的 alive 和 info 状态")
     return redirect(url_for('relay_connections'))
+
+
 
 """
 主机部分
 """
-
-
 
 # 协议转换部分
 @app.route('/conversion', methods=['GET', 'POST'])
